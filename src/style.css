@@ -1,0 +1,22 @@
+:root {
+  --paper: #f5f1e6;
+  --paper-card: #fbf9f3;
+  --paper-spine: #ece5d3;
+  --ink: #2b2a28;
+  --ink-faint: #8a8577;
+  --brass: #9c7a3c;
+  --red: #a6362c;
+  --green: #3b5d3a;
+  --rule: #e2dac4;
+  --rule-strong: #d4c9a8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+}
