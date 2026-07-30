@@ -1,10 +1,10 @@
-# Sổ Chi Tiêu
+# DMoney
 
 Vue 3 + Supabase, dạng PWA (cài được lên điện thoại và PC), host free.
 
 ## 1. Tạo Supabase project (free)
 1. Vào https://supabase.com → New project.
-2. Vào SQL Editor, chạy nội dung file `supabase_schema.sql`.
+2. Vào SQL Editor, chạy nội dung file `supabase_schema.sql`. Với project đã tạo bảng `entries`, file này cũng bao gồm migration để tự gán giao dịch cũ vào nguồn **Tiền mặt**.
 3. Vào Project Settings → API, lấy `Project URL` và `anon public key`.
 
 ## 2. Cấu hình local

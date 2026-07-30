@@ -17,10 +17,10 @@ export async function fetchEntries() {
   return data
 }
 
-export async function addEntry(amount, note) {
+export async function addEntry(amount, note, accountType, tag) {
   const { data, error } = await supabase
     .from('entries')
-    .insert({ amount, note })
+    .insert({ amount, note, account_type: accountType, tag })
     .select()
     .single()
   if (error) throw error

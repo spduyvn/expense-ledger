@@ -4,7 +4,7 @@
 
 Ứng dụng sổ thu chi cá nhân bằng **Vue 3 + Vite + Supabase**, có thể cài như PWA.
 
-- Tên hiển thị: **DMoney / Sổ Chi Tiêu**
+- Tên hiển thị: **DMoney / DMoney**
 - Ngôn ngữ giao diện: tiếng Việt
 - Giao dịch có `amount` âm là chi, dương là thu.
 - Số dư là tổng luỹ kế của tất cả giao dịch theo thời gian, từ cũ đến mới.

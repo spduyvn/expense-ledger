@@ -8,8 +8,8 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       manifest: {
-        name: 'Sổ Chi Tiêu',
-        short_name: 'Sổ Chi Tiêu',
+        name: 'DMoney',
+        short_name: 'DMoney',
         description: 'Ghi chép thu chi hàng ngày',
         theme_color: '#f5f1e6',
         background_color: '#f5f1e6',

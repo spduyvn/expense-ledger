@@ -3,8 +3,10 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { fetchEntries, addEntry, deleteEntry } from './supabase'
 
 const entries = ref([])
-const input = ref('')
+const input = ref('000')
 const note = ref('')
+const selectedAccountType = ref(null)
+const selectedTag = ref(null)
 const editingBalance = ref(false)
 const balanceInput = ref('')
 const savingBalance = ref(false)
@@ -14,8 +16,20 @@ const activeView = ref('today')
 const historyPeriod = ref('month')
 const searchQuery = ref('')
 const currentPage = ref(1)
+const todayPage = ref(1)
 const confirmingEntry = ref(null)
 const pageSize = 10
+const accountTypes = [
+  { value: 'cash', label: 'Tiền mặt' },
+  { value: 'bank', label: 'Tài khoản' },
+  { value: 'wallet', label: 'Ví' }
+]
+const balanceAccountTypes = [
+  { value: 'wallet', label: 'Ví' },
+  { value: 'bank', label: 'Tài khoản' },
+  { value: 'cash', label: 'Tiền mặt' }
+]
+const tags = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Hoá đơn', 'Giải trí', 'Sức khoẻ', 'Khác']
 
 onMounted(load)
 
@@ -37,14 +51,28 @@ const withBalance = computed(() => {
     return timeDiff || a.id.localeCompare(b.id)
   })
   let running = 0
+  const runningByAccount = { cash: 0, bank: 0, wallet: 0 }
   const rows = chrono.map((e) => {
-    running += e.amount
-    return { ...e, balance: running }
+    const amount = Number(e.amount)
+    const accountType = e.account_type || 'cash'
+    running += amount
+    runningByAccount[accountType] += amount
+    return {
+      ...e,
+      account_type: accountType,
+      balance: running,
+      accountBalance: runningByAccount[accountType]
+    }
   })
   return rows.reverse()
 })
 
 const currentBalance = computed(() => withBalance.value[0]?.balance ?? 0)
+const balancesByAccount = computed(() => entries.value.reduce((balances, entry) => {
+  const accountType = entry.account_type || 'cash'
+  balances[accountType] += Number(entry.amount)
+  return balances
+}, { cash: 0, bank: 0, wallet: 0 }))
 const currentDate = new Intl.DateTimeFormat('vi-VN', {
   weekday: 'long',
   day: '2-digit',
@@ -121,6 +149,8 @@ const filteredRows = computed(() => {
   const compactQuery = query.replace(/[.,\s]/g, '')
   return withBalance.value.filter((row) => {
     const noteMatches = normalizeSearch(row.note).includes(query)
+    const tagMatches = normalizeSearch(row.tag).includes(query)
+    const accountMatches = normalizeSearch(accountLabel(row.account_type)).includes(query)
     const amount = Number(row.amount)
     const amountValues = [
       String(row.amount),
@@ -134,12 +164,23 @@ const filteredRows = computed(() => {
       return normalizedValue.includes(query)
         || normalizedValue.replace(/[.,\s]/g, '').includes(compactQuery)
     })
-    return noteMatches || amountMatches
+    return noteMatches || tagMatches || accountMatches || amountMatches
   })
 })
 
 const todayRows = computed(() => withBalance.value.filter((row) => isSameLocalDay(row.created_at, new Date())))
 const dailyBalance = computed(() => todayRows.value.reduce((total, row) => total + Number(row.amount), 0))
+const todayTotalPages = computed(() => Math.max(1, Math.ceil(todayRows.value.length / pageSize)))
+const paginatedTodayRows = computed(() => {
+  const start = (todayPage.value - 1) * pageSize
+  return todayRows.value.slice(start, start + pageSize)
+})
+const todayVisibleRange = computed(() => {
+  if (!todayRows.value.length) return ''
+  const start = (todayPage.value - 1) * pageSize + 1
+  const end = Math.min(start + pageSize - 1, todayRows.value.length)
+  return `${start}–${end} trên ${todayRows.value.length} giao dịch`
+})
 const historyRows = computed(() => filteredRows.value.filter((row) => isInHistoryPeriod(row.created_at)))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(historyRows.value.length / pageSize)))
@@ -167,6 +208,10 @@ watch(totalPages, (pages) => {
   if (currentPage.value > pages) currentPage.value = pages
 })
 
+watch(todayTotalPages, (pages) => {
+  if (todayPage.value > pages) todayPage.value = pages
+})
+
 async function submit() {
   const raw = input.value.trim()
   if (!raw) return
@@ -175,20 +220,35 @@ async function submit() {
     error.value = 'Nhập số dạng -25000 hoặc +30000'
     return
   }
+  if (!selectedAccountType.value) {
+    error.value = 'Chọn nguồn tiền trước khi ghi sổ'
+    return
+  }
   error.value = ''
   try {
-    const created = await addEntry(amount, note.value.trim() || null)
+    const created = await addEntry(
+      amount,
+      note.value.trim() || null,
+      selectedAccountType.value,
+      selectedTag.value
+    )
     entries.value = [created, ...entries.value]
-    input.value = ''
+    input.value = '000'
     note.value = ''
+    selectedTag.value = null
     currentPage.value = 1
+    todayPage.value = 1
   } catch (e) {
     error.value = 'Không lưu được. Thử lại.'
   }
 }
 
 function startBalanceEdit() {
-  balanceInput.value = String(currentBalance.value)
+  if (!selectedAccountType.value) {
+    error.value = 'Chọn nguồn tiền trước khi điều chỉnh số dư'
+    return
+  }
+  balanceInput.value = String(balancesByAccount.value[selectedAccountType.value])
   editingBalance.value = true
   error.value = ''
 }
@@ -206,7 +266,12 @@ async function saveBalance() {
     return
   }
 
-  const adjustment = targetBalance - currentBalance.value
+  if (!selectedAccountType.value) {
+    error.value = 'Chọn nguồn tiền trước khi điều chỉnh số dư'
+    return
+  }
+
+  const adjustment = targetBalance - balancesByAccount.value[selectedAccountType.value]
   if (adjustment === 0) {
     cancelBalanceEdit()
     return
@@ -215,10 +280,16 @@ async function saveBalance() {
   error.value = ''
   savingBalance.value = true
   try {
-    const created = await addEntry(adjustment, 'Điều chỉnh số dư')
+    const created = await addEntry(
+      adjustment,
+      'Điều chỉnh số dư',
+      selectedAccountType.value,
+      null
+    )
     entries.value = [created, ...entries.value]
     cancelBalanceEdit()
     currentPage.value = 1
+    todayPage.value = 1
   } catch (e) {
     error.value = 'Không cập nhật được số dư. Thử lại.'
   } finally {
@@ -251,6 +322,17 @@ async function confirmRemove() {
 function fmt(n) {
   return new Intl.NumberFormat('vi-VN').format(n)
 }
+
+function placeAmountCursor(event) {
+  const inputElement = event.target
+  const suffixLength = inputElement.value.endsWith('000') ? 3 : 0
+  const position = inputElement.value.length - suffixLength
+  inputElement.setSelectionRange(position, position)
+}
+
+function accountLabel(accountType) {
+  return accountTypes.find((account) => account.value === accountType)?.label || 'Tiền mặt'
+}
 </script>
 
 <template>
@@ -267,13 +349,38 @@ function fmt(n) {
             <h1>DMoney</h1>
           </div>
           <div class="balance-controls">
-            <div class="stamp" :class="{ negative: currentBalance < 0 }">
-              <span class="stamp-label">Số dư</span>
-              <span class="stamp-amount">{{ fmt(currentBalance) }}</span>
+            <div class="balance-stamps" aria-label="Số dư theo nguồn tiền">
+              <div class="balance-total" :class="{ negative: currentBalance < 0 }">
+                <div class="balance-total-topline">
+                  <span class="balance-total-label">Tổng số dư</span>
+                  <button
+                    type="button"
+                    class="edit-balance-btn"
+                    aria-label="Điều chỉnh số dư"
+                    title="Điều chỉnh số dư"
+                    @click="startBalanceEdit"
+                  >
+                    <span aria-hidden="true">✎</span>
+                  </button>
+                </div>
+                <strong class="balance-total-amount">{{ fmt(currentBalance) }} <small>₫</small></strong>
+              </div>
+              <div class="balance-source-stamps">
+                <div
+                  v-for="account in balanceAccountTypes"
+                  :key="account.value"
+                  class="balance-source"
+                  :class="account.value"
+                  :aria-label="`${account.label}: ${fmt(balancesByAccount[account.value])} đồng`"
+                >
+                  <span class="balance-source-icon" aria-hidden="true"></span>
+                  <span class="balance-source-label">{{ account.label }}</span>
+                  <strong class="balance-source-amount" :class="{ negative: balancesByAccount[account.value] < 0 }">
+                    {{ fmt(balancesByAccount[account.value]) }} <small>₫</small>
+                  </strong>
+                </div>
+              </div>
             </div>
-            <button type="button" class="edit-balance-btn" @click="startBalanceEdit">
-              Điều chỉnh
-            </button>
           </div>
         </header>
 
@@ -284,6 +391,7 @@ function fmt(n) {
             type="text"
             inputmode="numeric"
             placeholder="Vnd"
+            @focus="placeAmountCursor"
             aria-label="Số tiền"
           />
           <input
@@ -293,6 +401,30 @@ function fmt(n) {
             placeholder="Note (tuỳ chọn)"
             aria-label="Ghi chú"
           />
+          <fieldset class="choice-group account-choice">
+            <legend>Nguồn tiền</legend>
+            <button
+              v-for="account in accountTypes"
+              :key="account.value"
+              type="button"
+              :class="{ active: selectedAccountType === account.value }"
+              @click="selectedAccountType = account.value"
+            >
+              {{ account.label }}
+            </button>
+          </fieldset>
+          <fieldset class="choice-group tag-choice">
+            <legend>Thẻ <span>(tuỳ chọn)</span></legend>
+            <button
+              v-for="tag in tags"
+              :key="tag"
+              type="button"
+              :class="{ active: selectedTag === tag }"
+              @click="selectedTag = selectedTag === tag ? null : tag"
+            >
+              {{ tag }}
+            </button>
+          </fieldset>
           <button type="submit" class="add-btn">Ghi sổ</button>
         </form>
         <form v-if="editingBalance" class="balance-form" @submit.prevent="saveBalance">
@@ -332,7 +464,6 @@ function fmt(n) {
                 {{ dailyBalance < 0 ? '' : '+' }}{{ fmt(dailyBalance) }}
               </strong>
             </div>
-
             <div v-if="!todayRows.length" class="empty">
               Hôm nay chưa có giao dịch nào.
             </div>
@@ -342,21 +473,47 @@ function fmt(n) {
                 <span class="rule"></span>
               </div>
               <button
-                v-for="row in todayRows"
+                v-for="row in paginatedTodayRows"
                 :key="row.id"
                 type="button"
                 class="row"
                 :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${fmt(row.amount)}`"
                 @click="requestRemove(row)"
               >
-                <span class="row-note">{{ row.note || '—' }}</span>
+                <span class="row-note">
+                  <span>{{ row.note || '—' }}</span>
+                  <span class="row-meta">
+                    <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
+                    <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
+                  </span>
+                </span>
                 <span class="row-time">{{ fmtTime(row.created_at) }}</span>
                 <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">
                   {{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}
                 </span>
-                <span class="row-balance">{{ fmt(row.balance) }}</span>
+                <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
               </button>
             </div>
+            <nav v-if="todayRows.length > pageSize" class="pagination" aria-label="Phân trang giao dịch hôm nay">
+              <span class="pagination-summary">{{ todayVisibleRange }}</span>
+              <div class="pagination-controls">
+                <button
+                  type="button"
+                  :disabled="todayPage === 1"
+                  @click="todayPage -= 1"
+                >
+                  Trước
+                </button>
+                <span>Trang {{ todayPage }} / {{ todayTotalPages }}</span>
+                <button
+                  type="button"
+                  :disabled="todayPage === todayTotalPages"
+                  @click="todayPage += 1"
+                >
+                  Sau
+                </button>
+              </div>
+            </nav>
           </template>
 
           <template v-else>
@@ -396,11 +553,9 @@ function fmt(n) {
                 placeholder="Tên hoặc số tiền"
               />
             </label>
-
             <div v-if="!historyRows.length" class="empty">
               Không tìm thấy giao dịch phù hợp.
             </div>
-
             <template v-else>
               <div v-for="group in grouped" :key="group.day" class="day-group">
                 <div class="day-label">
@@ -415,15 +570,20 @@ function fmt(n) {
                   :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${fmt(row.amount)}`"
                   @click="requestRemove(row)"
                 >
-                  <span class="row-note">{{ row.note || '—' }}</span>
+                  <span class="row-note">
+                    <span>{{ row.note || '—' }}</span>
+                    <span class="row-meta">
+                      <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
+                      <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
+                    </span>
+                  </span>
                   <span class="row-time">{{ fmtTime(row.created_at) }}</span>
                   <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">
                     {{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}
                   </span>
-                  <span class="row-balance">{{ fmt(row.balance) }}</span>
+                  <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
                 </button>
               </div>
-
               <nav class="pagination" aria-label="Phân trang giao dịch">
                 <span class="pagination-summary">{{ visibleRange }}</span>
                 <div class="pagination-controls">
@@ -520,11 +680,7 @@ function fmt(n) {
 }
 
 .head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-  gap: 12px;
+  margin-bottom: 16px;
 }
 .eyebrow {
   font-family: 'Inter', sans-serif;
@@ -541,45 +697,110 @@ function fmt(n) {
   color: var(--ink);
   margin: 0;
 }
-
-.stamp {
-  flex-shrink: 0;
-  width: 92px;
-  height: 92px;
-  border-radius: 50%;
-  border: 2px solid var(--brass);
-  color: var(--brass);
+.balance-stamps {
+  width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  border-radius: 16px;
+  background: rgba(236, 229, 211, 0.35);
+}
+.balance-total {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  transform: rotate(-8deg);
-  font-family: 'JetBrains Mono', monospace;
-  text-align: center;
-  line-height: 1.2;
+  gap: 2px;
+  padding: 10px 14px;
+  color: var(--ink);
 }
-.stamp.negative {
-  border-color: var(--red);
+.balance-total.negative {
   color: var(--red);
 }
-.stamp-label {
+.balance-total-label {
   font-family: 'Inter', sans-serif;
-  font-size: 9px;
-  letter-spacing: 0.08em;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
-  opacity: 0.85;
+  color: var(--brass);
 }
-.stamp-amount {
-  font-size: 15px;
+.balance-total-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.balance-total-amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 25px;
+  line-height: 1;
+  letter-spacing: -0.08em;
+}
+.balance-total-amount small,
+.balance-source-amount small {
+  font-size: 0.58em;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.balance-source-stamps {
+  padding: 0 14px;
+  background: rgba(251, 249, 243, 0.72);
+}
+.balance-source {
+  position: relative;
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+}
+.balance-source:not(:last-child)::after {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: var(--rule);
+  content: '';
+}
+.balance-source-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: #f4e7bf;
+  display: grid;
+  place-items: center;
+}
+.balance-source-icon::before {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 13px;
   font-weight: 700;
-  padding: 0 6px;
-  word-break: break-all;
+  color: var(--brass);
+}
+.balance-source.wallet .balance-source-icon::before {
+  content: '▣';
+}
+.balance-source.bank .balance-source-icon::before {
+  content: '⌂';
+}
+.balance-source.cash .balance-source-icon::before {
+  content: '▤';
+}
+.balance-source-label {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  color: var(--ink);
+}
+.balance-source-amount {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.balance-source-amount.negative {
+  color: var(--red);
 }
 .balance-controls {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
+  margin-top: 14px;
 }
 .edit-balance-btn,
 .cancel-balance-btn {
@@ -587,13 +808,26 @@ function fmt(n) {
   font-size: 11px;
   color: var(--ink-faint);
   border: 0;
-  padding: 2px 4px;
-  background: transparent;
+  padding: 7px 11px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  background: var(--paper-card);
   cursor: pointer;
+}
+.edit-balance-btn {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  padding: 0;
+  color: var(--brass);
 }
 .edit-balance-btn:hover,
 .cancel-balance-btn:hover {
   color: var(--brass);
+}
+.edit-balance-btn:hover {
+  background: rgba(156, 122, 60, 0.1);
 }
 
 .entry-form {
@@ -602,8 +836,47 @@ function fmt(n) {
   gap: 8px;
   margin-bottom: 6px;
 }
+.choice-group {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.choice-group legend {
+  width: 100%;
+  margin-bottom: 3px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  color: var(--ink-faint);
+}
+.choice-group legend span {
+  font-size: 10px;
+}
+.choice-group button {
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: var(--paper-card);
+  color: var(--ink-faint);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+}
+.choice-group button.active {
+  border-color: var(--brass);
+  background: rgba(156, 122, 60, 0.12);
+  color: var(--ink);
+  font-weight: 600;
+}
 .amount-input,
 .note-input {
+  box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
   font-family: 'JetBrains Mono', monospace;
   font-size: 14px;
   padding: 10px 12px;
@@ -826,6 +1099,26 @@ function fmt(n) {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.row-meta {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 5px;
+  vertical-align: middle;
+}
+.account-badge,
+.tag-badge {
+  display: inline-block;
+  padding: 1px 4px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  color: var(--ink-faint);
+  font-size: 9px;
+  line-height: 1.3;
+}
+.tag-badge {
+  border-color: rgba(156, 122, 60, 0.55);
+  color: var(--brass);
+}
 .row-time {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
@@ -927,10 +1220,6 @@ function fmt(n) {
 }
 
 @media (max-width: 380px) {
-  .stamp {
-    width: 78px;
-    height: 78px;
-  }
   .head h1 {
     font-size: 22px;
   }
