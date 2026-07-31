@@ -7,6 +7,11 @@ Vue 3 + Supabase, dạng PWA (cài được lên điện thoại và PC), host f
 2. Vào SQL Editor, chạy nội dung file `supabase_schema.sql`. Với project đã tạo bảng `entries`, file này cũng bao gồm migration để tự gán giao dịch cũ vào nguồn **Tiền mặt**.
 3. Vào Project Settings → API, lấy `Project URL` và `anon public key`.
 
+### Bật đăng nhập bằng Magic Link
+1. Trong Supabase Dashboard, vào **Authentication → Providers → Email** và bật Email provider.
+2. Để thử nhanh, có thể tắt **Confirm email**. Khi dùng production, nên giữ bật để xác thực địa chỉ email.
+3. Nếu project đã có giao dịch trước khi thêm đăng nhập, hãy gán `user_id` của chủ sở hữu cho các dòng cũ trong SQL Editor. Schema giữ nguyên các dòng đó và ẩn chúng cho đến khi được gán chủ sở hữu, tránh làm lộ dữ liệu.
+
 ## 2. Cấu hình local
 Tạo file `.env` ở thư mục gốc:
 ```
@@ -33,4 +38,4 @@ Mở trang deploy trên Chrome/Safari mobile → menu → "Add to Home Screen". 
 - Xoá 1 dòng: chạm/click vào dòng đó trong sổ.
 - Số dư "stamp" ở góc trên luôn là số dư mới nhất và được tính luỹ kế trên toàn bộ giao dịch, đổi màu đỏ khi âm.
 - Chọn **Điều chỉnh** để đặt lại số dư hiện tại. Ứng dụng tự thêm một dòng chênh lệch vào sổ, nên số dư sau đó vẫn được tính liên tục và không mất lịch sử.
-- Muốn nhiều người dùng riêng (đăng nhập)? Thêm Supabase Auth + cột `user_id`, đổi RLS policy trong `supabase_schema.sql` theo `auth.uid() = user_id`.
+- Mỗi tài khoản chỉ có thể đọc và thay đổi giao dịch có `user_id` của chính mình.

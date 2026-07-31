@@ -1,8 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { fetchEntries, addEntry, deleteEntry } from './supabase'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import Login from './components/Login.vue'
+import { fetchEntries, addEntry, deleteEntry, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
+const session = ref(null)
+const authLoading = ref(true)
 const input = ref('000')
 const note = ref('')
 const selectedAccountType = ref(null)
@@ -31,7 +34,33 @@ const balanceAccountTypes = [
 ]
 const tags = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Hoá đơn', 'Giải trí', 'Sức khoẻ', 'Khác']
 
-onMounted(load)
+let authSubscription
+
+onMounted(async () => {
+  try {
+    session.value = await getSession()
+    if (session.value) await load()
+  } catch (e) {
+    error.value = 'Không kiểm tra được trạng thái đăng nhập. Vui lòng thử lại.'
+  } finally {
+    authLoading.value = false
+  }
+
+  authSubscription = onAuthStateChange(async (nextSession) => {
+    const didChangeUser = session.value?.user?.id !== nextSession?.user?.id
+    session.value = nextSession
+
+    if (nextSession && didChangeUser) {
+      await load()
+    } else if (!nextSession) {
+      entries.value = []
+      loading.value = false
+      error.value = ''
+    }
+  })
+})
+
+onUnmounted(() => authSubscription?.unsubscribe())
 
 async function load() {
   loading.value = true
@@ -41,6 +70,14 @@ async function load() {
     error.value = 'Không tải được sổ. Kiểm tra kết nối Supabase.'
   } finally {
     loading.value = false
+  }
+}
+
+async function handleSignOut() {
+  try {
+    await signOut()
+  } catch (e) {
+    error.value = 'Không thể đăng xuất. Vui lòng thử lại.'
   }
 }
 
@@ -336,7 +373,9 @@ function accountLabel(accountType) {
 </script>
 
 <template>
-  <div class="page">
+  <div v-if="authLoading" class="auth-loading">Đang kiểm tra đăng nhập…</div>
+  <Login v-else-if="!session" />
+  <div v-else class="page">
     <div class="passbook">
       <div class="spine">
         <span v-for="i in 14" :key="i" class="hole"></span>
@@ -349,6 +388,7 @@ function accountLabel(accountType) {
             <h1>DMoney</h1>
           </div>
           <div class="balance-controls">
+            <button type="button" class="sign-out-btn" @click="handleSignOut">Đăng xuất</button>
             <div class="balance-stamps" aria-label="Số dư theo nguồn tiền">
               <div class="balance-total" :class="{ negative: currentBalance < 0 }">
                 <div class="balance-total-topline">
@@ -636,6 +676,17 @@ function accountLabel(accountType) {
 </template>
 
 <style scoped>
+.auth-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: var(--paper);
+  color: var(--ink-faint);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+}
+
 .page {
   min-height: 100vh;
   display: flex;
@@ -681,6 +732,21 @@ function accountLabel(accountType) {
 
 .head {
   margin-bottom: 16px;
+}
+.sign-out-btn {
+  display: block;
+  margin: 0 0 8px auto;
+  padding: 5px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.sign-out-btn:hover {
+  color: var(--red);
 }
 .eyebrow {
   font-family: 'Inter', sans-serif;

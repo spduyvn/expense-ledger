@@ -8,6 +8,34 @@ export const supabase = createClient(
   import.meta.env.VITE_SUPABASE_ANON_KEY
 )
 
+export async function signInWithMagicLink(email) {
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: window.location.origin
+    }
+  })
+  if (error) throw error
+}
+
+export async function signOut() {
+  const { error } = await supabase.auth.signOut()
+  if (error) throw error
+}
+
+export async function getSession() {
+  const { data, error } = await supabase.auth.getSession()
+  if (error) throw error
+  return data.session
+}
+
+export function onAuthStateChange(callback) {
+  const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+    callback(session)
+  })
+  return data.subscription
+}
+
 export async function fetchEntries() {
   const { data, error } = await supabase
     .from('entries')
