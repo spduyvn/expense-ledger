@@ -10,7 +10,8 @@ Vue 3 + Supabase, dạng PWA (cài được lên điện thoại và PC), host f
 ### Bật đăng nhập bằng Magic Link
 1. Trong Supabase Dashboard, vào **Authentication → Providers → Email** và bật Email provider.
 2. Để thử nhanh, có thể tắt **Confirm email**. Khi dùng production, nên giữ bật để xác thực địa chỉ email.
-3. Nếu project đã có giao dịch trước khi thêm đăng nhập, hãy gán `user_id` của chủ sở hữu cho các dòng cũ trong SQL Editor. Schema giữ nguyên các dòng đó và ẩn chúng cho đến khi được gán chủ sở hữu, tránh làm lộ dữ liệu.
+3. Vào **Authentication → URL Configuration**, thêm `http://localhost:3000/**` vào **Redirect URLs** để Magic Link quay về đúng local app. Khi deploy, thêm URL production (ví dụ `https://ten-app.vercel.app/**`) tại đây. Có thể đặt **Site URL** là URL production; URL callback local vẫn được cho phép qua Redirect URLs.
+4. Nếu project đã có giao dịch trước khi thêm đăng nhập, hãy gán `user_id` của chủ sở hữu cho các dòng cũ trong SQL Editor. Schema giữ nguyên các dòng đó và ẩn chúng cho đến khi được gán chủ sở hữu, tránh làm lộ dữ liệu.
 
 ## 2. Cấu hình local
 Tạo file `.env` ở thư mục gốc:
@@ -24,6 +25,8 @@ VITE_SUPABASE_ANON_KEY=xxxxxxxx
 npm install
 npm run dev
 ```
+
+Ứng dụng local chạy cố định tại `http://localhost:3000`. Nếu port này đang được dùng, Vite sẽ báo lỗi thay vì tự chuyển sang port khác, để URL Magic Link luôn khớp với Redirect URLs trong Supabase.
 
 ## 4. Deploy free (không cần VPS)
 - Đẩy code lên GitHub.
