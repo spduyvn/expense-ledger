@@ -384,11 +384,13 @@ function accountLabel(accountType) {
       <div class="sheet">
         <header class="head">
           <div class="head-text">
-            <p class="eyebrow">{{ currentDate }}</p>
+            <div class="head-meta">
+              <p class="eyebrow">{{ currentDate }}</p>
+              <button type="button" class="sign-out-btn" @click="handleSignOut">Đăng xuất</button>
+            </div>
             <h1>DMoney</h1>
           </div>
           <div class="balance-controls">
-            <button type="button" class="sign-out-btn" @click="handleSignOut">Đăng xuất</button>
             <div class="balance-stamps" aria-label="Số dư theo nguồn tiền">
               <div class="balance-total" :class="{ negative: currentBalance < 0 }">
                 <div class="balance-total-topline">
@@ -733,20 +735,27 @@ function accountLabel(accountType) {
 .head {
   margin-bottom: 16px;
 }
+.head-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 .sign-out-btn {
-  display: block;
-  margin: 0 0 8px auto;
-  padding: 5px 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink-faint);
+  flex: 0 0 auto;
+  padding: 5px 12px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  background: var(--paper-card);
+  color: var(--ink);
   cursor: pointer;
   font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  letter-spacing: 0.04em;
+  font-size: 12px;
+  line-height: 1.2;
 }
 .sign-out-btn:hover {
-  color: var(--red);
+  background: rgba(156, 122, 60, 0.1);
+  border-color: var(--brass);
 }
 .eyebrow {
   font-family: 'Inter', sans-serif;
