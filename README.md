@@ -42,3 +42,16 @@ Mở trang deploy trên Chrome/Safari mobile → menu → "Add to Home Screen". 
 - Số dư "stamp" ở góc trên luôn là số dư mới nhất và được tính luỹ kế trên toàn bộ giao dịch, đổi màu đỏ khi âm.
 - Chọn **Điều chỉnh** để đặt lại số dư hiện tại. Ứng dụng tự thêm một dòng chênh lệch vào sổ, nên số dư sau đó vẫn được tính liên tục và không mất lịch sử.
 - Mỗi tài khoản chỉ có thể đọc và thay đổi giao dịch có `user_id` của chính mình.
+
+## Điều chỉnh số dư và theo dõi nợ
+
+- `entries.entry_type` là `transaction` cho giao dịch thu/chi bình thường hoặc `adjustment` cho điều chỉnh số dư thủ công. Adjustment vẫn cập nhật số dư tài khoản và tổng số dư, nhưng không tham gia số dư ngày hoặc số dư chạy trên từng dòng.
+- Bảng `debts` lưu riêng các khoản nợ: `debt_type` là `owed` (bạn đang nợ) hoặc `lent` (người khác đang nợ bạn); `amount` dương là phát sinh, âm là trả/thu hồi. Hai tổng được hiển thị và xem chi tiết riêng.
+- Với database đã có dữ liệu cũ, chạy migration sau trong SQL Editor (file `supabase_schema.sql` cũng đã có đầy đủ):
+
+```sql
+alter table entries add column if not exists entry_type text;
+update entries set entry_type = 'transaction' where entry_type is null;
+alter table entries alter column entry_type set default 'transaction';
+alter table entries alter column entry_type set not null;
+```

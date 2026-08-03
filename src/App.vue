@@ -1,15 +1,22 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Login from './components/Login.vue'
-import { fetchEntries, addEntry, deleteEntry, signOut, getSession, onAuthStateChange } from './supabase'
+import { fetchEntries, addEntry, deleteEntry, fetchDebts, addDebt, deleteDebt, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
+const debts = ref([])
 const session = ref(null)
 const authLoading = ref(true)
-const input = ref('000')
+const input = ref('')
 const note = ref('')
 const selectedAccountType = ref(null)
 const selectedTag = ref(null)
+const entryType = ref('transaction')
+const entryDirection = ref(-1)
+const debtInput = ref('')
+const debtNote = ref('')
+const debtDirection = ref(1)
+const debtType = ref('owed')
 const editingBalance = ref(false)
 const balanceInput = ref('')
 const savingBalance = ref(false)
@@ -21,6 +28,8 @@ const searchQuery = ref('')
 const currentPage = ref(1)
 const todayPage = ref(1)
 const confirmingEntry = ref(null)
+const confirmingDebt = ref(null)
+const debtDetailType = ref(null)
 const pageSize = 10
 const accountTypes = [
   { value: 'cash', label: 'Tiền mặt' },
@@ -54,6 +63,7 @@ onMounted(async () => {
       await load()
     } else if (!nextSession) {
       entries.value = []
+      debts.value = []
       loading.value = false
       error.value = ''
     }
@@ -65,7 +75,9 @@ onUnmounted(() => authSubscription?.unsubscribe())
 async function load() {
   loading.value = true
   try {
-    entries.value = await fetchEntries()
+    const [loadedEntries, loadedDebts] = await Promise.all([fetchEntries(), fetchDebts()])
+    entries.value = loadedEntries
+    debts.value = loadedDebts
   } catch (e) {
     error.value = 'Không tải được sổ. Kiểm tra kết nối Supabase.'
   } finally {
@@ -92,8 +104,11 @@ const withBalance = computed(() => {
   const rows = chrono.map((e) => {
     const amount = Number(e.amount)
     const accountType = e.account_type || 'cash'
-    running += amount
-    runningByAccount[accountType] += amount
+    const isAdjustment = e.entry_type === 'adjustment'
+    if (!isAdjustment) {
+      running += amount
+      runningByAccount[accountType] += amount
+    }
     return {
       ...e,
       account_type: accountType,
@@ -104,7 +119,7 @@ const withBalance = computed(() => {
   return rows.reverse()
 })
 
-const currentBalance = computed(() => withBalance.value[0]?.balance ?? 0)
+const currentBalance = computed(() => entries.value.reduce((total, entry) => total + Number(entry.amount), 0))
 const balancesByAccount = computed(() => entries.value.reduce((balances, entry) => {
   const accountType = entry.account_type || 'cash'
   balances[accountType] += Number(entry.amount)
@@ -149,6 +164,12 @@ function isInHistoryPeriod(value) {
     return date >= weekStart && date <= now
   }
 
+  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+}
+
+function isInCurrentMonth(value) {
+  const date = new Date(value)
+  const now = new Date()
   return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
 }
 
@@ -206,7 +227,17 @@ const filteredRows = computed(() => {
 })
 
 const todayRows = computed(() => withBalance.value.filter((row) => isSameLocalDay(row.created_at, new Date())))
-const dailyBalance = computed(() => todayRows.value.reduce((total, row) => total + Number(row.amount), 0))
+const dailyBalance = computed(() => todayRows.value
+  .filter((row) => row.entry_type !== 'adjustment')
+  .reduce((total, row) => total + Number(row.amount), 0))
+const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
+const lentDebts = computed(() => debts.value.filter((debt) => debt.debt_type === 'lent'))
+const currentMonthDebt = computed(() => owedDebts.value
+  .filter((debt) => isInCurrentMonth(debt.created_at))
+  .reduce((total, debt) => total + Number(debt.amount), 0))
+const currentDebt = computed(() => owedDebts.value.reduce((total, debt) => total + Number(debt.amount), 0))
+const currentLent = computed(() => lentDebts.value.reduce((total, debt) => total + Number(debt.amount), 0))
+const visibleDebtDetails = computed(() => debtDetailType.value === 'lent' ? lentDebts.value : owedDebts.value)
 const todayTotalPages = computed(() => Math.max(1, Math.ceil(todayRows.value.length / pageSize)))
 const paginatedTodayRows = computed(() => {
   const start = (todayPage.value - 1) * pageSize
@@ -252,7 +283,7 @@ watch(todayTotalPages, (pages) => {
 async function submit() {
   const raw = input.value.trim()
   if (!raw) return
-  const amount = Number(raw.replace(/[, ]/g, ''))
+  const amount = Math.abs(Number(raw.replace(/[, ]/g, '')))
   if (Number.isNaN(amount) || amount === 0) {
     error.value = 'Nhập số dạng -25000 hoặc +30000'
     return
@@ -261,18 +292,25 @@ async function submit() {
     error.value = 'Chọn nguồn tiền trước khi ghi sổ'
     return
   }
+  if (entryType.value === 'adjustment' && !note.value.trim()) {
+    error.value = 'Nhập lý do khi điều chỉnh số dư'
+    return
+  }
   error.value = ''
   try {
     const created = await addEntry(
-      amount,
+      amount * entryDirection.value,
       note.value.trim() || null,
       selectedAccountType.value,
-      selectedTag.value
+      selectedTag.value,
+      entryType.value
     )
     entries.value = [created, ...entries.value]
-    input.value = '000'
+    input.value = ''
     note.value = ''
     selectedTag.value = null
+    entryDirection.value = -1
+    entryType.value = 'transaction'
     currentPage.value = 1
     todayPage.value = 1
   } catch (e) {
@@ -321,7 +359,8 @@ async function saveBalance() {
       adjustment,
       'Điều chỉnh số dư',
       selectedAccountType.value,
-      null
+      null,
+      'adjustment'
     )
     entries.value = [created, ...entries.value]
     cancelBalanceEdit()
@@ -336,6 +375,51 @@ async function saveBalance() {
 
 function requestRemove(entry) {
   confirmingEntry.value = entry
+}
+
+async function submitDebt() {
+  const raw = debtInput.value.trim()
+  const amount = Math.abs(Number(raw.replace(/[, ]/g, '')))
+  if (!raw || Number.isNaN(amount) || amount === 0) {
+    error.value = 'Nhập số nợ khác 0'
+    return
+  }
+  error.value = ''
+  try {
+    const created = await addDebt(amount * debtDirection.value, debtNote.value.trim() || null, debtType.value)
+    debts.value = [created, ...debts.value]
+    debtInput.value = ''
+    debtNote.value = ''
+    debtDirection.value = 1
+    debtType.value = 'owed'
+  } catch (e) {
+    error.value = 'Không lưu được khoản nợ. Thử lại.'
+  }
+}
+
+function requestRemoveDebt(debt) {
+  confirmingDebt.value = debt
+}
+
+function cancelRemoveDebt() {
+  confirmingDebt.value = null
+}
+
+function closeDebtDetails() {
+  debtDetailType.value = null
+}
+
+async function confirmRemoveDebt() {
+  const debt = confirmingDebt.value
+  if (!debt) return
+  confirmingDebt.value = null
+  debts.value = debts.value.filter((item) => item.id !== debt.id)
+  try {
+    await deleteDebt(debt.id)
+  } catch (e) {
+    error.value = 'Không xoá được khoản nợ trên máy chủ.'
+    load()
+  }
 }
 
 function cancelRemove() {
@@ -358,13 +442,6 @@ async function confirmRemove() {
 
 function fmt(n) {
   return new Intl.NumberFormat('vi-VN').format(n)
-}
-
-function placeAmountCursor(event) {
-  const inputElement = event.target
-  const suffixLength = inputElement.value.endsWith('000') ? 3 : 0
-  const position = inputElement.value.length - suffixLength
-  inputElement.setSelectionRange(position, position)
 }
 
 function accountLabel(accountType) {
@@ -423,6 +500,33 @@ function accountLabel(accountType) {
                 </div>
               </div>
             </div>
+            <section class="debt-card" aria-label="Theo dõi nợ">
+              <button type="button" class="debt-summary debt-total-button" @click="debtDetailType = 'owed'">
+                <span>Nợ hiện tại</span>
+                <strong>{{ fmt(currentDebt) }} <small>₫</small></strong>
+              </button>
+              <button type="button" class="debt-summary debt-total-button" @click="debtDetailType = 'lent'">
+                <span>Người khác đang nợ tôi</span>
+                <strong>{{ fmt(currentLent) }} <small>₫</small></strong>
+              </button>
+              <div class="debt-month">
+                <span>Nợ tháng này</span>
+                <strong>{{ currentMonthDebt < 0 ? '' : '+' }}{{ fmt(currentMonthDebt) }} <small>₫</small></strong>
+              </div>
+              <form class="debt-form" @submit.prevent="submitDebt">
+                <input v-model="debtInput" class="amount-input" type="text" inputmode="numeric" placeholder="Số tiền nợ" aria-label="Số tiền nợ" />
+                <input v-model="debtNote" class="note-input" type="text" placeholder="Ghi chú nợ" aria-label="Ghi chú nợ" />
+                <div class="amount-direction" aria-label="Nhóm khoản nợ">
+                  <button type="button" :class="{ active: debtType === 'owed' }" @click="debtType = 'owed'">Tôi đang nợ</button>
+                  <button type="button" :class="{ active: debtType === 'lent' }" @click="debtType = 'lent'">Cho người khác nợ</button>
+                </div>
+                <div class="amount-direction" aria-label="Loại khoản nợ">
+                  <button type="button" :class="{ active: debtDirection === 1 }" @click="debtDirection = 1">+ Phát sinh</button>
+                  <button type="button" :class="{ active: debtDirection === -1 }" @click="debtDirection = -1">− Thu hồi / trả</button>
+                </div>
+                <button type="submit" class="debt-add-btn">Ghi nợ</button>
+              </form>
+            </section>
           </div>
         </header>
 
@@ -433,16 +537,25 @@ function accountLabel(accountType) {
             type="text"
             inputmode="numeric"
             placeholder="Vnd"
-            @focus="placeAmountCursor"
             aria-label="Số tiền"
           />
           <input
             v-model="note"
             class="note-input"
             type="text"
-            placeholder="Note (tuỳ chọn)"
+            :placeholder="entryType === 'adjustment' ? 'Lý do điều chỉnh' : 'Note (tuỳ chọn)'"
             aria-label="Ghi chú"
           />
+          <fieldset class="choice-group entry-type-choice">
+            <legend>Loại ghi sổ</legend>
+            <button type="button" :class="{ active: entryType === 'transaction' }" @click="entryType = 'transaction'">Giao dịch thường</button>
+            <button type="button" :class="{ active: entryType === 'adjustment' }" @click="entryType = 'adjustment'">Điều chỉnh số dư</button>
+          </fieldset>
+          <fieldset class="choice-group amount-direction">
+            <legend>Loại tiền</legend>
+            <button type="button" :class="{ active: entryDirection === -1 }" @click="entryDirection = -1">− Chi</button>
+            <button type="button" :class="{ active: entryDirection === 1 }" @click="entryDirection = 1">+ Thu</button>
+          </fieldset>
           <fieldset class="choice-group account-choice">
             <legend>Nguồn tiền</legend>
             <button
@@ -525,12 +638,13 @@ function accountLabel(accountType) {
                 <span class="row-note">
                   <span>{{ row.note || '—' }}</span>
                   <span class="row-meta">
-                    <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
-                    <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
+                      <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
+                      <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
+                      <span v-if="row.entry_type === 'adjustment'" class="adjustment-badge">Điều chỉnh</span>
                   </span>
                 </span>
                 <span class="row-time">{{ fmtTime(row.created_at) }}</span>
-                <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">
+                <span class="row-amount" :class="[row.amount < 0 ? 'neg' : 'pos', { adjustment: row.entry_type === 'adjustment' }]">
                   {{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}
                 </span>
                 <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
@@ -615,12 +729,13 @@ function accountLabel(accountType) {
                   <span class="row-note">
                     <span>{{ row.note || '—' }}</span>
                     <span class="row-meta">
-                      <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
-                      <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
+                    <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
+                    <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
+                    <span v-if="row.entry_type === 'adjustment'" class="adjustment-badge">Điều chỉnh</span>
                     </span>
                   </span>
                   <span class="row-time">{{ fmtTime(row.created_at) }}</span>
-                  <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">
+                  <span class="row-amount" :class="[row.amount < 0 ? 'neg' : 'pos', { adjustment: row.entry_type === 'adjustment' }]">
                     {{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}
                   </span>
                   <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
@@ -671,6 +786,36 @@ function accountLabel(accountType) {
         <div class="dialog-actions">
           <button type="button" class="cancel-delete-btn" @click="cancelRemove">Huỷ</button>
           <button type="button" class="confirm-delete-btn" @click="confirmRemove">Xoá</button>
+        </div>
+      </section>
+    </div>
+    <div v-if="confirmingDebt" class="dialog-backdrop" @click.self="cancelRemoveDebt">
+      <section class="confirm-dialog debt-confirm-dialog" role="alertdialog" aria-modal="true">
+        <h2>Xoá khoản nợ?</h2>
+        <p>
+          {{ confirmingDebt.note || 'Khoản nợ không có ghi chú' }} ·
+          {{ confirmingDebt.amount < 0 ? '' : '+' }}{{ fmt(confirmingDebt.amount) }}.
+          Thao tác này không thể hoàn tác.
+        </p>
+        <div class="dialog-actions">
+          <button type="button" class="cancel-delete-btn" @click="cancelRemoveDebt">Huỷ</button>
+          <button type="button" class="confirm-delete-btn" @click="confirmRemoveDebt">Xoá</button>
+        </div>
+      </section>
+    </div>
+    <div v-if="debtDetailType" class="dialog-backdrop" @click.self="closeDebtDetails">
+      <section class="confirm-dialog debt-details-dialog" role="dialog" aria-modal="true">
+        <div class="debt-details-heading">
+          <h2>{{ debtDetailType === 'lent' ? 'Người khác đang nợ tôi' : 'Nợ hiện tại' }}</h2>
+          <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeDebtDetails">×</button>
+        </div>
+        <p>{{ visibleDebtDetails.length ? 'Chạm vào một dòng để xoá khoản nợ.' : 'Chưa có khoản nào.' }}</p>
+        <div v-if="visibleDebtDetails.length" class="debt-list debt-details-list">
+          <button v-for="debt in visibleDebtDetails" :key="debt.id" type="button" class="debt-row" @click="requestRemoveDebt(debt)">
+            <span class="debt-date">{{ new Date(debt.created_at).toLocaleDateString('vi-VN') }}</span>
+            <span class="debt-note">{{ debt.note || '—' }}</span>
+            <span class="debt-amount">{{ debt.amount < 0 ? '' : '+' }}{{ fmt(debt.amount) }}</span>
+          </button>
         </div>
       </section>
     </div>
@@ -875,8 +1020,79 @@ function accountLabel(accountType) {
 }
 .balance-controls {
   display: flex;
+  flex-direction: column;
   margin-top: 14px;
 }
+.debt-card {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(166, 54, 44, 0.35);
+  border-radius: 6px;
+  color: var(--red);
+  background: rgba(166, 54, 44, 0.05);
+}
+.debt-summary,
+.debt-month {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+}
+.debt-total-button {
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.debt-total-button + .debt-total-button { margin-top: 6px; }
+.debt-total-button:hover strong { text-decoration: underline; }
+.debt-summary strong,
+.debt-month strong,
+.debt-amount {
+  font-family: 'JetBrains Mono', monospace;
+}
+.debt-summary strong { font-size: 16px; }
+.debt-month { margin-top: 5px; }
+.debt-form { display: grid; grid-template-columns: 1fr 1fr auto; gap: 6px; margin-top: 9px; }
+.debt-form .amount-input,
+.debt-form .note-input { padding: 7px 8px; font-size: 11px; }
+.amount-direction {
+  display: flex;
+  gap: 6px;
+}
+.amount-direction button {
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: var(--paper-card);
+  color: var(--ink-faint);
+  cursor: pointer;
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+}
+.amount-direction button.active {
+  border-color: var(--brass);
+  background: rgba(156, 122, 60, 0.12);
+  color: var(--ink);
+  font-weight: 600;
+}
+.debt-form .amount-direction { grid-column: 1 / -1; }
+.debt-form .amount-direction button:first-child.active { border-color: var(--red); background: rgba(166, 54, 44, 0.1); color: var(--red); }
+.debt-form .debt-add-btn { grid-column: 1 / -1; }
+.debt-add-btn { border: 0; border-radius: 4px; padding: 7px 9px; background: var(--red); color: var(--paper-card); cursor: pointer; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; }
+.debt-list { margin-top: 8px; border-top: 1px solid rgba(166, 54, 44, 0.18); }
+.debt-row { display: grid; grid-template-columns: auto 1fr auto; gap: 7px; width: 100%; padding: 6px 0; border: 0; border-bottom: 1px solid rgba(166, 54, 44, 0.14); background: transparent; color: var(--ink); text-align: left; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 11px; }
+.debt-date { color: var(--ink-faint); }
+.debt-note { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.debt-amount { color: var(--red); text-align: right; }
+.debt-details-dialog { max-height: min(70vh, 520px); display: flex; flex-direction: column; }
+.debt-details-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.close-details-btn { width: 28px; height: 28px; border: 1px solid var(--rule-strong); border-radius: 50%; background: var(--paper-card); color: var(--ink-faint); cursor: pointer; font-size: 20px; line-height: 1; }
+.debt-details-list { overflow-y: auto; }
 .edit-balance-btn,
 .cancel-balance-btn {
   font-family: 'Inter', sans-serif;
@@ -1213,6 +1429,8 @@ function accountLabel(accountType) {
 .row-amount.pos {
   color: var(--green);
 }
+.row-amount.adjustment { color: var(--ink-faint); }
+.adjustment-badge { color: var(--ink-faint); font-size: 9px; }
 .row-balance {
   font-family: 'JetBrains Mono', monospace;
   font-size: 12px;
