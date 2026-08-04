@@ -30,6 +30,7 @@ const todayPage = ref(1)
 const confirmingEntry = ref(null)
 const confirmingDebt = ref(null)
 const debtDetailType = ref(null)
+const debtModalOpen = ref(false)
 const pageSize = 10
 const accountTypes = [
   { value: 'cash', label: 'Tiền mặt' },
@@ -129,55 +130,57 @@ const currentDate = new Intl.DateTimeFormat('vi-VN', {
   weekday: 'long',
   day: '2-digit',
   month: '2-digit',
-  year: 'numeric'
+  year: 'numeric',
+  timeZone: 'UTC'
 }).format(new Date())
 
-function dateKey(value) {
+function utcDateKey(value) {
   const date = new Date(value)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
+  const year = date.getUTCFullYear()
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
+  const day = String(date.getUTCDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
 
-function isSameLocalDay(value, date) {
-  return dateKey(value) === dateKey(date)
+function isSameUtcDay(value, date) {
+  return utcDateKey(value) === utcDateKey(date)
 }
 
-function startOfDay(date = new Date()) {
+function startOfUtcDay(date = new Date()) {
   const result = new Date(date)
-  result.setHours(0, 0, 0, 0)
+  result.setUTCHours(0, 0, 0, 0)
   return result
 }
 
 function isInHistoryPeriod(value) {
   const date = new Date(value)
   const now = new Date()
-  const today = startOfDay(now)
+  const today = startOfUtcDay(now)
 
-  if (historyPeriod.value === 'day') return isSameLocalDay(date, today)
+  if (historyPeriod.value === 'day') return isSameUtcDay(date, today)
 
   if (historyPeriod.value === 'week') {
     const weekStart = new Date(today)
-    const weekday = weekStart.getDay() || 7
-    weekStart.setDate(weekStart.getDate() - weekday + 1)
+    const weekday = weekStart.getUTCDay() || 7
+    weekStart.setUTCDate(weekStart.getUTCDate() - weekday + 1)
     return date >= weekStart && date <= now
   }
 
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+  return date.getUTCFullYear() === now.getUTCFullYear() && date.getUTCMonth() === now.getUTCMonth()
 }
 
 function isInCurrentMonth(value) {
   const date = new Date(value)
   const now = new Date()
-  return date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+  return date.getUTCFullYear() === now.getUTCFullYear() && date.getUTCMonth() === now.getUTCMonth()
 }
 
 function fmtTime(value) {
   return new Intl.DateTimeFormat('vi-VN', {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false
+    hour12: false,
+    timeZone: 'Asia/Ho_Chi_Minh'
   }).format(new Date(value))
 }
 
@@ -186,7 +189,7 @@ function groupByDay(rows) {
   let currentDay = null
   for (const row of rows) {
     const day = new Date(row.created_at).toLocaleDateString('vi-VN', {
-      weekday: 'short', day: '2-digit', month: '2-digit'
+      weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC'
     })
     if (day !== currentDay) {
       groups.push({ day, rows: [] })
@@ -226,7 +229,7 @@ const filteredRows = computed(() => {
   })
 })
 
-const todayRows = computed(() => withBalance.value.filter((row) => isSameLocalDay(row.created_at, new Date())))
+const todayRows = computed(() => withBalance.value.filter((row) => isSameUtcDay(row.created_at, new Date())))
 const dailyBalance = computed(() => todayRows.value
   .filter((row) => row.entry_type !== 'adjustment')
   .reduce((total, row) => total + Number(row.amount), 0))
@@ -392,9 +395,19 @@ async function submitDebt() {
     debtNote.value = ''
     debtDirection.value = 1
     debtType.value = 'owed'
+    debtModalOpen.value = false
   } catch (e) {
     error.value = 'Không lưu được khoản nợ. Thử lại.'
   }
+}
+
+function openDebtModal() {
+  error.value = ''
+  debtModalOpen.value = true
+}
+
+function closeDebtModal() {
+  debtModalOpen.value = false
 }
 
 function requestRemoveDebt(debt) {
@@ -505,27 +518,7 @@ function accountLabel(accountType) {
                 <span>Nợ hiện tại</span>
                 <strong>{{ fmt(currentDebt) }} <small>₫</small></strong>
               </button>
-              <button type="button" class="debt-summary debt-total-button" @click="debtDetailType = 'lent'">
-                <span>Người khác đang nợ tôi</span>
-                <strong>{{ fmt(currentLent) }} <small>₫</small></strong>
-              </button>
-              <div class="debt-month">
-                <span>Nợ tháng này</span>
-                <strong>{{ currentMonthDebt < 0 ? '' : '+' }}{{ fmt(currentMonthDebt) }} <small>₫</small></strong>
-              </div>
-              <form class="debt-form" @submit.prevent="submitDebt">
-                <input v-model="debtInput" class="amount-input" type="text" inputmode="numeric" placeholder="Số tiền nợ" aria-label="Số tiền nợ" />
-                <input v-model="debtNote" class="note-input" type="text" placeholder="Ghi chú nợ" aria-label="Ghi chú nợ" />
-                <div class="amount-direction" aria-label="Nhóm khoản nợ">
-                  <button type="button" :class="{ active: debtType === 'owed' }" @click="debtType = 'owed'">Tôi đang nợ</button>
-                  <button type="button" :class="{ active: debtType === 'lent' }" @click="debtType = 'lent'">Cho người khác nợ</button>
-                </div>
-                <div class="amount-direction" aria-label="Loại khoản nợ">
-                  <button type="button" :class="{ active: debtDirection === 1 }" @click="debtDirection = 1">+ Phát sinh</button>
-                  <button type="button" :class="{ active: debtDirection === -1 }" @click="debtDirection = -1">− Thu hồi / trả</button>
-                </div>
-                <button type="submit" class="debt-add-btn">Ghi nợ</button>
-              </form>
+              <button type="button" class="debt-add-btn debt-open-btn" @click="openDebtModal">+ Ghi khoản nợ</button>
             </section>
           </div>
         </header>
@@ -819,6 +812,33 @@ function accountLabel(accountType) {
         </div>
       </section>
     </div>
+    <div v-if="debtModalOpen" class="dialog-backdrop" @click.self="closeDebtModal">
+      <section class="confirm-dialog debt-entry-dialog" role="dialog" aria-modal="true" aria-labelledby="debt-entry-title">
+        <div class="debt-details-heading">
+          <h2 id="debt-entry-title">Ghi khoản nợ</h2>
+          <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeDebtModal">×</button>
+        </div>
+        <form class="debt-form debt-modal-form" @submit.prevent="submitDebt">
+          <label class="debt-field-label" for="debt-amount">Số tiền</label>
+          <input id="debt-amount" v-model="debtInput" class="amount-input" type="text" inputmode="numeric" placeholder="Số tiền nợ" aria-label="Số tiền nợ" autofocus />
+          <label class="debt-field-label" for="debt-note">Ghi chú</label>
+          <input id="debt-note" v-model="debtNote" class="note-input" type="text" placeholder="Ghi chú nợ (tuỳ chọn)" aria-label="Ghi chú nợ" />
+          <div class="amount-direction" aria-label="Nhóm khoản nợ">
+            <button type="button" :class="{ active: debtType === 'owed' }" @click="debtType = 'owed'">Tôi đang nợ</button>
+            <button type="button" :class="{ active: debtType === 'lent' }" @click="debtType = 'lent'">Cho người khác nợ</button>
+          </div>
+          <div class="amount-direction" aria-label="Loại khoản nợ">
+            <button type="button" :class="{ active: debtDirection === 1 }" @click="debtDirection = 1">+ Phát sinh</button>
+            <button type="button" :class="{ active: debtDirection === -1 }" @click="debtDirection = -1">− Thu hồi / trả</button>
+          </div>
+          <p v-if="error" class="debt-modal-error">{{ error }}</p>
+          <div class="dialog-actions">
+            <button type="button" class="cancel-delete-btn" @click="closeDebtModal">Huỷ</button>
+            <button type="submit" class="confirm-delete-btn debt-submit-btn">Ghi nợ</button>
+          </div>
+        </form>
+      </section>
+    </div>
   </div>
 </template>
 
@@ -1084,6 +1104,16 @@ function accountLabel(accountType) {
 .debt-form .amount-direction button:first-child.active { border-color: var(--red); background: rgba(166, 54, 44, 0.1); color: var(--red); }
 .debt-form .debt-add-btn { grid-column: 1 / -1; }
 .debt-add-btn { border: 0; border-radius: 4px; padding: 7px 9px; background: var(--red); color: var(--paper-card); cursor: pointer; font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 600; }
+.debt-open-btn { width: 100%; margin-top: 10px; }
+.debt-entry-dialog { width: min(100%, 380px); }
+.debt-modal-form { grid-template-columns: 1fr; gap: 8px; margin-top: 14px; }
+.debt-modal-form .amount-input,
+.debt-modal-form .note-input { padding: 10px 12px; font-size: 14px; }
+.debt-field-label { font-family: 'Inter', sans-serif; font-size: 12px; color: var(--ink-faint); }
+.debt-modal-form .amount-direction { flex-wrap: wrap; }
+.debt-modal-form .dialog-actions { margin-top: 4px; }
+.debt-modal-form .debt-submit-btn { border-color: var(--red); }
+.debt-modal-error { margin: 0; font-family: 'Inter', sans-serif; font-size: 12px; color: var(--red); }
 .debt-list { margin-top: 8px; border-top: 1px solid rgba(166, 54, 44, 0.18); }
 .debt-row { display: grid; grid-template-columns: auto 1fr auto; gap: 7px; width: 100%; padding: 6px 0; border: 0; border-bottom: 1px solid rgba(166, 54, 44, 0.14); background: transparent; color: var(--ink); text-align: left; cursor: pointer; font-family: 'Inter', sans-serif; font-size: 11px; }
 .debt-date { color: var(--ink-faint); }
