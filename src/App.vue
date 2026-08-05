@@ -11,7 +11,6 @@ const input = ref('')
 const note = ref('')
 const selectedAccountType = ref(null)
 const selectedTag = ref(null)
-const entryType = ref('transaction')
 const entryDirection = ref(-1)
 const debtInput = ref('')
 const debtNote = ref('')
@@ -295,10 +294,6 @@ async function submit() {
     error.value = 'Chọn nguồn tiền trước khi ghi sổ'
     return
   }
-  if (entryType.value === 'adjustment' && !note.value.trim()) {
-    error.value = 'Nhập lý do khi điều chỉnh số dư'
-    return
-  }
   error.value = ''
   try {
     const created = await addEntry(
@@ -306,14 +301,13 @@ async function submit() {
       note.value.trim() || null,
       selectedAccountType.value,
       selectedTag.value,
-      entryType.value
+      'transaction'
     )
     entries.value = [created, ...entries.value]
     input.value = ''
     note.value = ''
     selectedTag.value = null
     entryDirection.value = -1
-    entryType.value = 'transaction'
     currentPage.value = 1
     todayPage.value = 1
   } catch (e) {
@@ -514,6 +508,10 @@ function accountLabel(accountType) {
               </div>
             </div>
             <section class="debt-card" aria-label="Theo dõi nợ">
+              <button type="button" class="debt-summary debt-total-button" @click="debtDetailType = 'lent'">
+                <span>Đang cho nợ</span>
+                <strong>{{ fmt(currentLent) }} <small>₫</small></strong>
+              </button>
               <button type="button" class="debt-summary debt-total-button" @click="debtDetailType = 'owed'">
                 <span>Nợ hiện tại</span>
                 <strong>{{ fmt(currentDebt) }} <small>₫</small></strong>
@@ -536,14 +534,9 @@ function accountLabel(accountType) {
             v-model="note"
             class="note-input"
             type="text"
-            :placeholder="entryType === 'adjustment' ? 'Lý do điều chỉnh' : 'Note (tuỳ chọn)'"
+            placeholder="Note (tuỳ chọn)"
             aria-label="Ghi chú"
           />
-          <fieldset class="choice-group entry-type-choice">
-            <legend>Loại ghi sổ</legend>
-            <button type="button" :class="{ active: entryType === 'transaction' }" @click="entryType = 'transaction'">Giao dịch thường</button>
-            <button type="button" :class="{ active: entryType === 'adjustment' }" @click="entryType = 'adjustment'">Điều chỉnh số dư</button>
-          </fieldset>
           <fieldset class="choice-group amount-direction">
             <legend>Loại tiền</legend>
             <button type="button" :class="{ active: entryDirection === -1 }" @click="entryDirection = -1">− Chi</button>
@@ -607,7 +600,7 @@ function accountLabel(accountType) {
         <div class="ledger" v-if="!loading">
           <template v-if="activeView === 'today'">
             <div class="daily-balance">
-              <span>Số dư ngày</span>
+              <span>Thu nhập ngày</span>
               <strong :class="dailyBalance < 0 ? 'neg' : 'pos'">
                 {{ dailyBalance < 0 ? '' : '+' }}{{ fmt(dailyBalance) }}
               </strong>
