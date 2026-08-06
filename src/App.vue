@@ -462,6 +462,10 @@ async function saveBalance() {
 }
 
 function requestRemove(entry) {
+  if (!isSameUtcDay(entry.created_at, new Date())) {
+    error.value = 'Không thể xoá giao dịch của ngày trước.'
+    return
+  }
   confirmingEntry.value = entry
 }
 
@@ -749,6 +753,7 @@ const detailVisibleRange = computed(() => {
                 :key="row.id"
                 type="button"
                 class="row"
+                :disabled="!isSameUtcDay(row.created_at, new Date())"
                 :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${fmt(row.amount)}`"
                 @click="requestRemove(row)"
               >
@@ -878,6 +883,7 @@ const detailVisibleRange = computed(() => {
                   :key="row.id"
                   type="button"
                   class="row"
+                  :disabled="!isSameUtcDay(row.created_at, new Date())"
                   :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${fmt(row.amount)}`"
                   @click="requestRemove(row)"
                 >
@@ -1008,7 +1014,7 @@ const detailVisibleRange = computed(() => {
           <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeDetails">×</button>
         </div>
         <div class="detail-list">
-          <button v-for="row in paginatedDetailRows" :key="row.id" type="button" class="row" @click="requestRemove(row)">
+          <button v-for="row in paginatedDetailRows" :key="row.id" type="button" class="row" :disabled="!isSameUtcDay(row.created_at, new Date())" @click="requestRemove(row)">
             <span class="row-note">{{ row.note || '—' }} <span class="row-meta"><span class="account-badge">{{ accountLabel(row.account_type) }}</span><span v-if="row.tag" class="tag-badge">{{ row.tag }}</span></span></span>
             <span class="row-time">{{ fmtTime(row.created_at) }}</span>
             <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">{{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}</span>
@@ -1619,6 +1625,12 @@ const detailVisibleRange = computed(() => {
 }
 .row:hover {
   background: rgba(156, 122, 60, 0.06);
+}
+.row:disabled {
+  cursor: default;
+}
+.row:disabled:hover {
+  background: transparent;
 }
 .row-note {
   font-family: 'Inter', sans-serif;
