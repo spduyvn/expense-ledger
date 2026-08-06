@@ -24,8 +24,14 @@ const error = ref('')
 const activeView = ref('today')
 const historyPeriod = ref('month')
 const searchQuery = ref('')
+const dateSearchMode = ref('day')
+const dateFrom = ref('')
+const dateTo = ref('')
 const currentPage = ref(1)
 const todayPage = ref(1)
+const detailRows = ref([])
+const detailTitle = ref('')
+const detailPage = ref(1)
 const confirmingEntry = ref(null)
 const confirmingDebt = ref(null)
 const debtDetailType = ref(null)
@@ -46,6 +52,7 @@ const tags = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Hoá đơn', 'Giải tr
 let authSubscription
 
 onMounted(async () => {
+  document.addEventListener('keydown', handleKeydown)
   try {
     session.value = await getSession()
     if (session.value) await load()
@@ -70,7 +77,10 @@ onMounted(async () => {
   })
 })
 
-onUnmounted(() => authSubscription?.unsubscribe())
+onUnmounted(() => {
+  authSubscription?.unsubscribe()
+  document.removeEventListener('keydown', handleKeydown)
+})
 
 async function load() {
   loading.value = true
@@ -228,6 +238,14 @@ const filteredRows = computed(() => {
   })
 })
 
+function matchesDateSearch(row) {
+  const day = utcDateKey(row.created_at)
+  if (dateSearchMode.value === 'day') return !dateFrom.value || day === dateFrom.value
+  if (dateFrom.value && day < dateFrom.value) return false
+  if (dateTo.value && day > dateTo.value) return false
+  return true
+}
+
 const todayRows = computed(() => withBalance.value.filter((row) => isSameUtcDay(row.created_at, new Date())))
 const dailyBalance = computed(() => todayRows.value
   .filter((row) => row.entry_type !== 'adjustment')
@@ -251,7 +269,65 @@ const todayVisibleRange = computed(() => {
   const end = Math.min(start + pageSize - 1, todayRows.value.length)
   return `${start}–${end} trên ${todayRows.value.length} giao dịch`
 })
-const historyRows = computed(() => filteredRows.value.filter((row) => isInHistoryPeriod(row.created_at)))
+const hasDateSearch = computed(() => Boolean(dateFrom.value || dateTo.value))
+const historyRows = computed(() => filteredRows.value.filter((row) => (
+  matchesDateSearch(row) && (hasDateSearch.value ? true : isInHistoryPeriod(row.created_at))
+)))
+
+const dailySummaries = computed(() => {
+  const summaryByDay = new Map()
+  for (const row of historyRows.value) {
+    const key = utcDateKey(row.created_at)
+    if (!summaryByDay.has(key)) {
+      summaryByDay.set(key, { key, rows: [], income: 0, expense: 0 })
+    }
+    const summary = summaryByDay.get(key)
+    summary.rows.push(row)
+    if (row.entry_type !== 'adjustment') {
+      if (Number(row.amount) >= 0) summary.income += Number(row.amount)
+      else summary.expense += Math.abs(Number(row.amount))
+    }
+  }
+  return [...summaryByDay.values()].map((summary) => ({
+    ...summary,
+    net: summary.income - summary.expense,
+    label: formatDayLabel(summary.key)
+  }))
+})
+
+const chartBuckets = computed(() => {
+  const now = new Date()
+  const start = startOfUtcDay(now)
+  const buckets = []
+  let count = historyPeriod.value === 'week' ? 7 : new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getUTCDate()
+  if (hasDateSearch.value) {
+    const firstKey = dateFrom.value || utcDateKey(historyRows.value.at(-1)?.created_at || now)
+    const lastKey = dateTo.value || utcDateKey(historyRows.value[0]?.created_at || now)
+    const [startYear, startMonth, startDay] = firstKey.split('-').map(Number)
+    const [endYear, endMonth, endDay] = lastKey.split('-').map(Number)
+    start.setTime(Date.UTC(startYear, startMonth - 1, startDay))
+    const end = new Date(Date.UTC(endYear, endMonth - 1, endDay))
+    count = Math.max(1, Math.round((end - start) / 86400000) + 1)
+  } else if (historyPeriod.value === 'week') {
+    const weekday = start.getUTCDay() || 7
+    start.setUTCDate(start.getUTCDate() - weekday + 1)
+  } else {
+    start.setUTCDate(1)
+  }
+  for (let index = 0; index < count; index += 1) {
+    const date = new Date(start)
+    date.setUTCDate(start.getUTCDate() + index)
+    const key = utcDateKey(date)
+    const rows = historyRows.value.filter((row) => utcDateKey(row.created_at) === key)
+    const income = rows.filter((row) => row.entry_type !== 'adjustment' && Number(row.amount) > 0).reduce((sum, row) => sum + Number(row.amount), 0)
+    const expense = rows.filter((row) => row.entry_type !== 'adjustment' && Number(row.amount) < 0).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0)
+    buckets.push({ key, rows, income, expense, label: historyPeriod.value === 'week' ? formatWeekday(key) : String(index + 1) })
+  }
+  return buckets
+})
+const chartMax = computed(() => Math.max(1, ...chartBuckets.value.flatMap((bucket) => [bucket.income, bucket.expense])))
+const chartIncomeTotal = computed(() => chartBuckets.value.reduce((sum, bucket) => sum + bucket.income, 0))
+const chartExpenseTotal = computed(() => chartBuckets.value.reduce((sum, bucket) => sum + bucket.expense, 0))
 
 const totalPages = computed(() => Math.max(1, Math.ceil(historyRows.value.length / pageSize)))
 const paginatedRows = computed(() => {
@@ -265,8 +341,19 @@ const visibleRange = computed(() => {
   const end = Math.min(start + pageSize - 1, historyRows.value.length)
   return `${start}–${end} trên ${historyRows.value.length} giao dịch`
 })
+const dailySummaryPages = computed(() => Math.max(1, Math.ceil(dailySummaries.value.length / pageSize)))
+const paginatedDailySummaries = computed(() => dailySummaries.value.slice((currentPage.value - 1) * pageSize, currentPage.value * pageSize))
+const dailySummaryRange = computed(() => {
+  if (!dailySummaries.value.length) return ''
+  const start = (currentPage.value - 1) * pageSize + 1
+  return `${start}–${Math.min(start + pageSize - 1, dailySummaries.value.length)} trên ${dailySummaries.value.length} ngày`
+})
 
 watch(searchQuery, () => {
+  currentPage.value = 1
+})
+
+watch([dateSearchMode, dateFrom, dateTo], () => {
   currentPage.value = 1
 })
 
@@ -276,6 +363,10 @@ watch(historyPeriod, () => {
 
 watch(totalPages, (pages) => {
   if (currentPage.value > pages) currentPage.value = pages
+})
+
+watch(dailySummaryPages, (pages) => {
+  if (historyPeriod.value === 'day' && currentPage.value > pages) currentPage.value = pages
 })
 
 watch(todayTotalPages, (pages) => {
@@ -371,6 +462,10 @@ async function saveBalance() {
 }
 
 function requestRemove(entry) {
+  if (!isSameUtcDay(entry.created_at, new Date())) {
+    error.value = 'Không thể xoá giao dịch của ngày trước.'
+    return
+  }
   confirmingEntry.value = entry
 }
 
@@ -454,6 +549,46 @@ function fmt(n) {
 function accountLabel(accountType) {
   return accountTypes.find((account) => account.value === accountType)?.label || 'Tiền mặt'
 }
+
+function formatDayLabel(key) {
+  const [year, month, day] = key.split('-').map(Number)
+  return new Intl.DateTimeFormat('vi-VN', { weekday: 'long', day: '2-digit', month: '2-digit', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(year, month - 1, day)))
+}
+
+function formatWeekday(key) {
+  const [year, month, day] = key.split('-').map(Number)
+  return new Intl.DateTimeFormat('vi-VN', { weekday: 'short', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(year, month - 1, day)))
+}
+
+function openDetails(rows, title) {
+  detailRows.value = rows
+  detailTitle.value = title
+  detailPage.value = 1
+}
+
+function closeDetails() {
+  detailRows.value = []
+  detailTitle.value = ''
+}
+
+function resetDateSearch() {
+  dateFrom.value = ''
+  dateTo.value = ''
+}
+
+function handleKeydown(event) {
+  if (event.key === 'Escape' && detailTitle.value) closeDetails()
+}
+
+const detailTotalPages = computed(() => Math.max(1, Math.ceil(detailRows.value.length / pageSize)))
+const paginatedDetailRows = computed(() => detailRows.value.slice((detailPage.value - 1) * pageSize, detailPage.value * pageSize))
+const detailVisibleRange = computed(() => {
+  if (!detailRows.value.length) return ''
+  const start = (detailPage.value - 1) * pageSize + 1
+  return `${start}–${Math.min(start + pageSize - 1, detailRows.value.length)} trên ${detailRows.value.length} giao dịch`
+})
 </script>
 
 <template>
@@ -618,6 +753,7 @@ function accountLabel(accountType) {
                 :key="row.id"
                 type="button"
                 class="row"
+                :disabled="!isSameUtcDay(row.created_at, new Date())"
                 :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${fmt(row.amount)}`"
                 @click="requestRemove(row)"
               >
@@ -686,20 +822,58 @@ function accountLabel(accountType) {
                   Tháng
                 </button>
               </div>
-            <label class="search-field" for="transaction-search">
-              <span>Tìm giao dịch</span>
-              <input
-                id="transaction-search"
-                v-model="searchQuery"
-                type="search"
-                placeholder="Tên hoặc số tiền"
-              />
-            </label>
+            <div class="history-search-tools">
+              <label class="search-field" for="transaction-search">
+                <span>Tên hoặc số tiền</span>
+                <input id="transaction-search" v-model="searchQuery" type="search" placeholder="Ví dụ: ăn trưa hoặc 50.000" />
+              </label>
+              <div class="date-search">
+                <div class="date-mode-tabs" aria-label="Kiểu lọc ngày">
+                  <button type="button" :class="{ active: dateSearchMode === 'day' }" @click="dateSearchMode = 'day'; dateTo = ''">Theo ngày</button>
+                  <button type="button" :class="{ active: dateSearchMode === 'range' }" @click="dateSearchMode = 'range'">Khoảng ngày</button>
+                </div>
+                <div class="date-inputs">
+                  <label>{{ dateSearchMode === 'day' ? 'Ngày' : 'Từ ngày' }} <input v-model="dateFrom" type="date" /></label>
+                  <label v-if="dateSearchMode === 'range'">Đến ngày <input v-model="dateTo" type="date" /></label>
+                  <button v-if="dateFrom || dateTo" type="button" class="clear-date-btn" @click="resetDateSearch">Xoá lọc ngày</button>
+                </div>
+              </div>
+            </div>
             <div v-if="!historyRows.length" class="empty">
               Không tìm thấy giao dịch phù hợp.
             </div>
             <template v-else>
-              <div v-for="group in grouped" :key="group.day" class="day-group">
+              <div v-if="historyPeriod === 'day'" class="summary-list">
+                <button v-for="summary in paginatedDailySummaries" :key="summary.key" type="button" class="day-summary-row" @click="openDetails(summary.rows, summary.label)">
+                  <span class="day-summary-label">{{ summary.label }}</span>
+                  <span class="day-summary-values">
+                    <small class="pos">+{{ fmt(summary.income) }}</small>
+                    <small class="neg">−{{ fmt(summary.expense) }}</small>
+                  </span>
+                  <strong :class="summary.net < 0 ? 'neg' : 'pos'">{{ summary.net < 0 ? '' : '+' }}{{ fmt(summary.net) }}</strong>
+                </button>
+              </div>
+              <div v-else class="chart-card">
+                <div class="bar-chart" :class="{ compact: historyPeriod === 'month' }">
+                  <button v-for="bucket in chartBuckets" :key="bucket.key" type="button" class="bar-column" :aria-label="`Mở giao dịch ${bucket.key}`" @click="openDetails(bucket.rows, historyPeriod === 'week' ? bucket.label : `Ngày ${bucket.label} trong tháng`)" :disabled="!bucket.rows.length">
+                    <span class="bar-stack">
+                      <span class="bar income-bar" :style="{ height: `${bucket.income / chartMax * 100}%` }"></span>
+                      <span class="bar expense-bar" :style="{ height: `${bucket.expense / chartMax * 100}%` }"></span>
+                    </span>
+                    <span class="bar-label">{{ bucket.label }}</span>
+                  </button>
+                </div>
+                <p class="chart-summary">Tổng chi: <strong class="neg">−{{ fmt(chartExpenseTotal) }}</strong> · Tổng thu: <strong class="pos">+{{ fmt(chartIncomeTotal) }}</strong></p>
+              </div>
+              <div v-if="historyPeriod === 'day' && dailySummaries.length > pageSize" class="summary-pagination pagination">
+                <span>{{ dailySummaryRange }}</span>
+                <div class="pagination-controls">
+                  <button type="button" :disabled="currentPage === 1" @click="currentPage -= 1">Trước</button>
+                  <span>Trang {{ currentPage }} / {{ dailySummaryPages }}</span>
+                  <button type="button" :disabled="currentPage === dailySummaryPages" @click="currentPage += 1">Sau</button>
+                </div>
+              </div>
+              <div v-for="group in []" :key="group.day" class="day-group">
                 <div class="day-label">
                   <span>{{ group.day }}</span>
                   <span class="rule"></span>
@@ -709,6 +883,7 @@ function accountLabel(accountType) {
                   :key="row.id"
                   type="button"
                   class="row"
+                  :disabled="!isSameUtcDay(row.created_at, new Date())"
                   :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${fmt(row.amount)}`"
                   @click="requestRemove(row)"
                 >
@@ -727,7 +902,7 @@ function accountLabel(accountType) {
                   <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
                 </button>
               </div>
-              <nav class="pagination" aria-label="Phân trang giao dịch">
+              <nav v-if="false" class="pagination" aria-label="Phân trang giao dịch">
                 <span class="pagination-summary">{{ visibleRange }}</span>
                 <div class="pagination-controls">
                   <button
@@ -830,6 +1005,23 @@ function accountLabel(accountType) {
             <button type="submit" class="confirm-delete-btn debt-submit-btn">Ghi nợ</button>
           </div>
         </form>
+      </section>
+    </div>
+    <div v-if="detailTitle" class="dialog-backdrop" @click.self="closeDetails">
+      <section class="confirm-dialog detail-dialog" role="dialog" aria-modal="true">
+        <div class="debt-details-heading">
+          <h2>{{ detailTitle }}</h2>
+          <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeDetails">×</button>
+        </div>
+        <div class="detail-list">
+          <button v-for="row in paginatedDetailRows" :key="row.id" type="button" class="row" :disabled="!isSameUtcDay(row.created_at, new Date())" @click="requestRemove(row)">
+            <span class="row-note">{{ row.note || '—' }} <span class="row-meta"><span class="account-badge">{{ accountLabel(row.account_type) }}</span><span v-if="row.tag" class="tag-badge">{{ row.tag }}</span></span></span>
+            <span class="row-time">{{ fmtTime(row.created_at) }}</span>
+            <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">{{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}</span>
+            <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
+          </button>
+        </div>
+        <nav v-if="detailRows.length > pageSize" class="pagination"><span>{{ detailVisibleRange }}</span><div class="pagination-controls"><button type="button" :disabled="detailPage === 1" @click="detailPage -= 1">Trước</button><span>{{ detailPage }} / {{ detailTotalPages }}</span><button type="button" :disabled="detailPage === detailTotalPages" @click="detailPage += 1">Sau</button></div></nav>
       </section>
     </div>
   </div>
@@ -1366,6 +1558,35 @@ function accountLabel(accountType) {
 .search-field input:focus {
   border-color: var(--brass);
 }
+.history-search-tools { display: grid; gap: 10px; margin-bottom: 12px; }
+.date-search { display: grid; gap: 7px; }
+.date-mode-tabs { display: flex; gap: 6px; }
+.date-mode-tabs button, .clear-date-btn { border: 1px solid var(--rule-strong); border-radius: 4px; padding: 5px 8px; background: var(--paper-card); color: var(--ink-faint); font: 11px 'Inter', sans-serif; cursor: pointer; }
+.date-mode-tabs button.active { border-color: var(--brass); color: var(--ink); background: rgba(156, 122, 60, 0.12); font-weight: 600; }
+.date-inputs { display: flex; align-items: end; flex-wrap: wrap; gap: 7px; }
+.date-inputs label { display: grid; gap: 3px; color: var(--ink-faint); font: 10px 'Inter', sans-serif; }
+.date-inputs input { min-width: 0; padding: 7px 8px; border: 1px solid var(--rule-strong); border-radius: 4px; background: var(--paper); color: var(--ink); font: 12px 'Inter', sans-serif; }
+.clear-date-btn { color: var(--red); }
+.day-summary-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 10px; width: 100%; padding: 12px 2px; border: 0; border-bottom: 1px solid var(--rule); background: transparent; text-align: left; cursor: pointer; }
+.day-summary-row:hover { background: rgba(156, 122, 60, 0.06); }
+.day-summary-label { color: var(--ink); font: 14px 'Newsreader', serif; text-transform: capitalize; }
+.day-summary-values { display: grid; gap: 2px; text-align: right; font: 10px 'JetBrains Mono', monospace; }
+.day-summary-row strong { min-width: 78px; text-align: right; font: 13px 'JetBrains Mono', monospace; }
+.chart-card { padding-top: 8px; }
+.bar-chart { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; align-items: end; min-height: 190px; padding: 12px 2px 0; border-bottom: 1px solid var(--rule-strong); }
+.bar-chart.compact { grid-template-columns: repeat(auto-fit, minmax(14px, 1fr)); gap: 2px; }
+.bar-column { display: flex; min-width: 0; height: 176px; flex-direction: column; align-items: center; justify-content: end; gap: 6px; border: 0; background: transparent; cursor: pointer; padding: 0; }
+.bar-column:disabled { cursor: default; opacity: .45; }
+.bar-stack { display: flex; width: min(20px, 80%); height: 150px; flex-direction: column; justify-content: end; gap: 1px; }
+.bar { display: block; min-height: 0; border-radius: 2px 2px 0 0; transition: height .2s ease; }
+.income-bar { background: var(--green); }
+.expense-bar { background: var(--red); }
+.bar-label { overflow: hidden; max-width: 100%; color: var(--ink-faint); font: 9px 'Inter', sans-serif; text-overflow: ellipsis; white-space: nowrap; }
+.chart-summary { margin: 10px 0 0; color: var(--ink-faint); font: 11px 'Inter', sans-serif; }
+.chart-summary strong { font-family: 'JetBrains Mono', monospace; }
+.detail-dialog { width: min(100%, 470px); max-height: min(78vh, 620px); display: flex; flex-direction: column; }
+.detail-list { overflow-y: auto; }
+.detail-list .row { flex: 0 0 auto; }
 .day-group {
   margin-bottom: 4px;
 }
@@ -1404,6 +1625,12 @@ function accountLabel(accountType) {
 }
 .row:hover {
   background: rgba(156, 122, 60, 0.06);
+}
+.row:disabled {
+  cursor: default;
+}
+.row:disabled:hover {
+  background: transparent;
 }
 .row-note {
   font-family: 'Inter', sans-serif;
@@ -1552,5 +1779,7 @@ function accountLabel(accountType) {
   .row-balance {
     min-width: 56px;
   }
+  .day-summary-row { grid-template-columns: 1fr auto; }
+  .day-summary-values { grid-column: 1 / -1; grid-row: 2; display: flex; gap: 8px; text-align: left; }
 }
 </style>
