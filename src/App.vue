@@ -32,6 +32,7 @@ const todayPage = ref(1)
 const detailRows = ref([])
 const detailTitle = ref('')
 const detailPage = ref(1)
+const selectedEntryDetail = ref(null)
 const confirmingEntry = ref(null)
 const confirmingDebt = ref(null)
 const debtDetailType = ref(null)
@@ -166,7 +167,7 @@ function isInHistoryPeriod(value) {
   const now = new Date()
   const today = startOfUtcDay(now)
 
-  if (historyPeriod.value === 'day') return isSameUtcDay(date, today)
+  if (historyPeriod.value === 'day') return true
 
   if (historyPeriod.value === 'week') {
     const weekStart = new Date(today)
@@ -462,8 +463,8 @@ async function saveBalance() {
 }
 
 function requestRemove(entry) {
-  if (!isSameUtcDay(entry.created_at, new Date())) {
-    error.value = 'Không thể xoá giao dịch của ngày trước.'
+  if (activeView.value !== 'today' || !isSameUtcDay(entry.created_at, new Date())) {
+    error.value = 'Chỉ có thể xoá giao dịch hôm nay trong tab Hôm nay.'
     return
   }
   confirmingEntry.value = entry
@@ -573,13 +574,23 @@ function closeDetails() {
   detailTitle.value = ''
 }
 
+function openEntryDetail(row) {
+  selectedEntryDetail.value = row
+}
+
+function closeEntryDetail() {
+  selectedEntryDetail.value = null
+}
+
 function resetDateSearch() {
   dateFrom.value = ''
   dateTo.value = ''
 }
 
 function handleKeydown(event) {
-  if (event.key === 'Escape' && detailTitle.value) closeDetails()
+  if (event.key !== 'Escape') return
+  if (selectedEntryDetail.value) closeEntryDetail()
+  else if (detailTitle.value) closeDetails()
 }
 
 const detailTotalPages = computed(() => Math.max(1, Math.ceil(detailRows.value.length / pageSize)))
@@ -1014,7 +1025,7 @@ const detailVisibleRange = computed(() => {
           <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeDetails">×</button>
         </div>
         <div class="detail-list">
-          <button v-for="row in paginatedDetailRows" :key="row.id" type="button" class="row" :disabled="!isSameUtcDay(row.created_at, new Date())" @click="requestRemove(row)">
+          <button v-for="row in paginatedDetailRows" :key="row.id" type="button" class="row" @click="openEntryDetail(row)">
             <span class="row-note">{{ row.note || '—' }} <span class="row-meta"><span class="account-badge">{{ accountLabel(row.account_type) }}</span><span v-if="row.tag" class="tag-badge">{{ row.tag }}</span></span></span>
             <span class="row-time">{{ fmtTime(row.created_at) }}</span>
             <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">{{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}</span>
@@ -1022,6 +1033,18 @@ const detailVisibleRange = computed(() => {
           </button>
         </div>
         <nav v-if="detailRows.length > pageSize" class="pagination"><span>{{ detailVisibleRange }}</span><div class="pagination-controls"><button type="button" :disabled="detailPage === 1" @click="detailPage -= 1">Trước</button><span>{{ detailPage }} / {{ detailTotalPages }}</span><button type="button" :disabled="detailPage === detailTotalPages" @click="detailPage += 1">Sau</button></div></nav>
+      </section>
+    </div>
+    <div v-if="selectedEntryDetail" class="dialog-backdrop" @click.self="closeEntryDetail">
+      <section class="confirm-dialog entry-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="entry-detail-title">
+        <div class="debt-details-heading">
+          <h2 id="entry-detail-title">Chi tiết giao dịch</h2>
+          <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeEntryDetail">×</button>
+        </div>
+        <p class="entry-detail-amount" :class="selectedEntryDetail.amount < 0 ? 'neg' : 'pos'">
+          {{ selectedEntryDetail.amount < 0 ? '' : '+' }}{{ fmt(selectedEntryDetail.amount) }} ₫
+        </p>
+        <p class="entry-detail-note">{{ selectedEntryDetail.note || 'Không có ghi chú' }}</p>
       </section>
     </div>
   </div>
@@ -1587,6 +1610,9 @@ const detailVisibleRange = computed(() => {
 .detail-dialog { width: min(100%, 470px); max-height: min(78vh, 620px); display: flex; flex-direction: column; }
 .detail-list { overflow-y: auto; }
 .detail-list .row { flex: 0 0 auto; }
+.entry-detail-dialog { width: min(100%, 340px); }
+.entry-detail-amount { margin: 18px 0 8px; font: 600 25px 'JetBrains Mono', monospace; }
+.entry-detail-note { margin: 0; padding: 10px 0 4px; border-top: 1px solid var(--rule); color: var(--ink); font: 14px/1.5 'Inter', sans-serif; }
 .day-group {
   margin-bottom: 4px;
 }
