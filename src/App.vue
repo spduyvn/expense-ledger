@@ -780,7 +780,6 @@ const detailVisibleRange = computed(() => {
                 <span class="row-amount" :class="[row.amount < 0 ? 'neg' : 'pos', { adjustment: row.entry_type === 'adjustment' }]">
                   {{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}
                 </span>
-                <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
               </button>
             </div>
             <nav v-if="todayRows.length > pageSize" class="pagination" aria-label="Phân trang giao dịch hôm nay">
