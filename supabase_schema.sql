@@ -9,6 +9,7 @@ create table if not exists entries (
   tag text,
   entry_type text not null default 'transaction'
     check (entry_type in ('transaction', 'adjustment')),
+  counts_toward_daily boolean not null default true,
   user_id uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz not null default now()
 );
@@ -23,6 +24,10 @@ alter table entries add column if not exists entry_type text;
 update entries set entry_type = 'transaction' where entry_type is null;
 alter table entries alter column entry_type set default 'transaction';
 alter table entries alter column entry_type set not null;
+alter table entries add column if not exists counts_toward_daily boolean;
+update entries set counts_toward_daily = true where counts_toward_daily is null;
+alter table entries alter column counts_toward_daily set default true;
+alter table entries alter column counts_toward_daily set not null;
 
 -- Migration an toàn cho bảng cũ: các dòng cũ không thể tự xác định chủ sở hữu,
 -- nên vẫn giữ nguyên dữ liệu và bị ẩn cho đến khi bạn gán user_id đúng cho chúng.
@@ -80,6 +85,30 @@ create policy "Users can update their own entries" on entries
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
 create policy "Users can delete their own entries" on entries
+  for delete using (user_id = auth.uid());
+
+create table if not exists tags (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  user_id uuid not null default auth.uid() references auth.users(id),
+  created_at timestamptz not null default now(),
+  unique (user_id, name)
+);
+
+alter table tags enable row level security;
+
+drop policy if exists "Users can select their own tags" on tags;
+drop policy if exists "Users can insert their own tags" on tags;
+drop policy if exists "Users can update their own tags" on tags;
+drop policy if exists "Users can delete their own tags" on tags;
+
+create policy "Users can select their own tags" on tags
+  for select using (user_id = auth.uid());
+create policy "Users can insert their own tags" on tags
+  for insert with check (user_id = auth.uid());
+create policy "Users can update their own tags" on tags
+  for update using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "Users can delete their own tags" on tags
   for delete using (user_id = auth.uid());
 
 create table if not exists debts (
