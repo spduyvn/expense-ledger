@@ -18,7 +18,12 @@ Tạo file `.env` ở thư mục gốc:
 ```
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=xxxxxxxx
+VITE_APP_ENV=local
 ```
+
+Khi `VITE_APP_ENV=local`, ứng dụng tự tạo phiên **Anonymous Sign-In** và không hiển thị màn hình Magic Link hay cần mật khẩu. Bật Anonymous Sign-Ins trong **Supabase Dashboard → Authentication → Providers → Anonymous** trước khi chạy local. Phiên test được lưu trong trình duyệt nên dữ liệu tiếp tục được dùng ở các lần chạy sau; xoá site data để tạo phiên test mới.
+
+Với Supabase RLS, không thể tự đăng nhập vào một user email cố định chỉ từ frontend mà không có mật khẩu, Magic Link hoặc backend bảo mật. Anonymous Sign-In là lựa chọn phù hợp để bỏ đăng nhập khi test local mà vẫn tuân thủ RLS.
 
 ## 3. Chạy thử
 ```bash
@@ -31,7 +36,7 @@ npm run dev
 ## 4. Deploy free (không cần VPS)
 - Đẩy code lên GitHub.
 - Vào https://vercel.com hoặc https://app.netlify.com → Import từ GitHub.
-- Thêm 2 biến môi trường `VITE_SUPABASE_URL` và `VITE_SUPABASE_ANON_KEY` trong phần Environment Variables của project trên Vercel/Netlify.
+- Thêm `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` và `VITE_APP_ENV=production` trong phần Environment Variables của project trên Vercel/Netlify.
 - Deploy — có sẵn HTTPS, domain miễn phí dạng `ten-app.vercel.app`.
 
 ## 5. Cài lên điện thoại

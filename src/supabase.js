@@ -18,6 +18,12 @@ export async function signInWithMagicLink(email) {
   if (error) throw error
 }
 
+export async function signInAnonymously() {
+  const { data, error } = await supabase.auth.signInAnonymously()
+  if (error) throw error
+  return data.session
+}
+
 export async function signOut() {
   const { error } = await supabase.auth.signOut()
   if (error) throw error
@@ -45,10 +51,10 @@ export async function fetchEntries() {
   return data
 }
 
-export async function addEntry(amount, note, accountType, tag, entryType = 'transaction') {
+export async function addEntry(amount, note, accountType, tag, entryType = 'transaction', countsTowardDaily = true) {
   const { data, error } = await supabase
     .from('entries')
-    .insert({ amount, note, account_type: accountType, tag, entry_type: entryType })
+    .insert({ amount, note, account_type: accountType, tag, entry_type: entryType, counts_toward_daily: countsTowardDaily })
     .select()
     .single()
   if (error) throw error
@@ -57,6 +63,40 @@ export async function addEntry(amount, note, accountType, tag, entryType = 'tran
 
 export async function deleteEntry(id) {
   const { error } = await supabase.from('entries').delete().eq('id', id)
+  if (error) throw error
+}
+
+export async function fetchTags() {
+  const { data, error } = await supabase
+    .from('tags')
+    .select('*')
+    .order('name', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function addTags(names) {
+  const { data, error } = await supabase
+    .from('tags')
+    .insert(names.map((name) => ({ name })))
+    .select()
+  if (error) throw error
+  return data
+}
+
+export async function updateTag(id, name) {
+  const { data, error } = await supabase
+    .from('tags')
+    .update({ name })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteTag(id) {
+  const { error } = await supabase.from('tags').delete().eq('id', id)
   if (error) throw error
 }
 

@@ -1,17 +1,24 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import Login from './components/Login.vue'
-import { fetchEntries, addEntry, deleteEntry, fetchDebts, addDebt, deleteDebt, signOut, getSession, onAuthStateChange } from './supabase'
+import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebts, addDebt, deleteDebt, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
+const tags = ref([])
 const debts = ref([])
 const session = ref(null)
 const authLoading = ref(true)
+const localAuthError = ref('')
 const input = ref('')
 const note = ref('')
 const selectedAccountType = ref(null)
 const selectedTag = ref(null)
+const tagModalOpen = ref(false)
+const tagInput = ref('')
+const editingTagId = ref(null)
+const editingTagName = ref('')
 const entryDirection = ref(-1)
+const countsTowardDaily = ref(true)
 const debtInput = ref('')
 const debtNote = ref('')
 const debtDirection = ref(1)
@@ -48,17 +55,22 @@ const balanceAccountTypes = [
   { value: 'bank', label: 'Tài khoản' },
   { value: 'cash', label: 'Tiền mặt' }
 ]
-const tags = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Hoá đơn', 'Giải trí', 'Sức khoẻ', 'Khác']
+const defaultTagNames = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Hoá đơn', 'Giải trí', 'Sức khoẻ', 'Khác']
+const isLocalEnvironment = import.meta.env.VITE_APP_ENV === 'local'
 
 let authSubscription
 
 onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
   try {
-    session.value = await getSession()
+    session.value = isLocalEnvironment ? await getLocalSession() : await getSession()
     if (session.value) await load()
   } catch (e) {
-    error.value = 'Không kiểm tra được trạng thái đăng nhập. Vui lòng thử lại.'
+    if (isLocalEnvironment) {
+      localAuthError.value = 'Không thể tạo phiên test local. Hãy bật Anonymous Sign-Ins trong Supabase Authentication → Providers → Anonymous.'
+    } else {
+      error.value = 'Không kiểm tra được trạng thái đăng nhập. Vui lòng thử lại.'
+    }
   } finally {
     authLoading.value = false
   }
@@ -71,6 +83,7 @@ onMounted(async () => {
       await load()
     } else if (!nextSession) {
       entries.value = []
+      tags.value = []
       debts.value = []
       loading.value = false
       error.value = ''
@@ -83,17 +96,32 @@ onUnmounted(() => {
   document.removeEventListener('keydown', handleKeydown)
 })
 
+async function getLocalSession() {
+  const currentSession = await getSession()
+  if (currentSession?.user?.is_anonymous) return currentSession
+  if (currentSession) await signOut()
+  return signInAnonymously()
+}
+
 async function load() {
   loading.value = true
   try {
-    const [loadedEntries, loadedDebts] = await Promise.all([fetchEntries(), fetchDebts()])
+    const [loadedEntries, loadedTags, loadedDebts] = await Promise.all([fetchEntries(), fetchTags(), fetchDebts()])
     entries.value = loadedEntries
+    tags.value = loadedTags
     debts.value = loadedDebts
+    await seedDefaultTags()
   } catch (e) {
     error.value = 'Không tải được sổ. Kiểm tra kết nối Supabase.'
   } finally {
     loading.value = false
   }
+}
+
+async function seedDefaultTags() {
+  if (tags.value.length) return
+  const createdTags = await addTags(defaultTagNames)
+  tags.value = [...tags.value, ...createdTags].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
 }
 
 async function handleSignOut() {
@@ -249,7 +277,7 @@ function matchesDateSearch(row) {
 
 const todayRows = computed(() => withBalance.value.filter((row) => isSameUtcDay(row.created_at, new Date())))
 const dailyBalance = computed(() => todayRows.value
-  .filter((row) => row.entry_type !== 'adjustment')
+  .filter(isCountedTowardDaily)
   .reduce((total, row) => total + Number(row.amount), 0))
 const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
 const lentDebts = computed(() => debts.value.filter((debt) => debt.debt_type === 'lent'))
@@ -284,7 +312,7 @@ const dailySummaries = computed(() => {
     }
     const summary = summaryByDay.get(key)
     summary.rows.push(row)
-    if (row.entry_type !== 'adjustment') {
+    if (isCountedTowardDaily(row)) {
       if (Number(row.amount) >= 0) summary.income += Number(row.amount)
       else summary.expense += Math.abs(Number(row.amount))
     }
@@ -320,8 +348,8 @@ const chartBuckets = computed(() => {
     date.setUTCDate(start.getUTCDate() + index)
     const key = utcDateKey(date)
     const rows = historyRows.value.filter((row) => utcDateKey(row.created_at) === key)
-    const income = rows.filter((row) => row.entry_type !== 'adjustment' && Number(row.amount) > 0).reduce((sum, row) => sum + Number(row.amount), 0)
-    const expense = rows.filter((row) => row.entry_type !== 'adjustment' && Number(row.amount) < 0).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0)
+    const income = rows.filter((row) => isCountedTowardDaily(row) && Number(row.amount) > 0).reduce((sum, row) => sum + Number(row.amount), 0)
+    const expense = rows.filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0)
     buckets.push({ key, rows, income, expense, label: historyPeriod.value === 'week' ? formatWeekday(key) : String(index + 1) })
   }
   return buckets
@@ -393,13 +421,15 @@ async function submit() {
       note.value.trim() || null,
       selectedAccountType.value,
       selectedTag.value,
-      'transaction'
+      'transaction',
+      countsTowardDaily.value
     )
     entries.value = [created, ...entries.value]
     input.value = ''
     note.value = ''
     selectedTag.value = null
     entryDirection.value = -1
+    countsTowardDaily.value = true
     currentPage.value = 1
     todayPage.value = 1
   } catch (e) {
@@ -420,6 +450,86 @@ function startBalanceEdit() {
 function cancelBalanceEdit() {
   editingBalance.value = false
   balanceInput.value = ''
+}
+
+function openTagModal() {
+  error.value = ''
+  tagInput.value = ''
+  editingTagId.value = null
+  editingTagName.value = ''
+  tagModalOpen.value = true
+}
+
+function closeTagModal() {
+  tagModalOpen.value = false
+  tagInput.value = ''
+  editingTagId.value = null
+  editingTagName.value = ''
+}
+
+function startTagEdit(tag) {
+  editingTagId.value = tag.id
+  editingTagName.value = tag.name
+}
+
+function cancelTagEdit() {
+  editingTagId.value = null
+  editingTagName.value = ''
+}
+
+function validateTagName(name, excludeId = null) {
+  const trimmedName = name.trim()
+  if (!trimmedName) {
+    error.value = 'Nhập tên thẻ'
+    return null
+  }
+  if (tags.value.some((tag) => tag.id !== excludeId && normalizeSearch(tag.name) === normalizeSearch(trimmedName))) {
+    error.value = 'Thẻ này đã tồn tại'
+    return null
+  }
+  return trimmedName
+}
+
+async function submitTag() {
+  const name = validateTagName(tagInput.value)
+  if (!name) return
+  error.value = ''
+  try {
+    const createdTags = await addTags([name])
+    tags.value = [...tags.value, ...createdTags].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+    tagInput.value = ''
+  } catch (e) {
+    error.value = 'Không thể thêm thẻ. Thử lại.'
+  }
+}
+
+async function saveTag(tag) {
+  const name = validateTagName(editingTagName.value, tag.id)
+  if (!name) return
+  error.value = ''
+  try {
+    const updatedTag = await updateTag(tag.id, name)
+    const oldName = tag.name
+    tags.value = tags.value.map((item) => item.id === updatedTag.id ? updatedTag : item)
+      .sort((a, b) => a.name.localeCompare(b.name, 'vi'))
+    if (selectedTag.value === oldName) selectedTag.value = updatedTag.name
+    cancelTagEdit()
+  } catch (e) {
+    error.value = 'Không thể sửa thẻ. Thử lại.'
+  }
+}
+
+async function removeTag(tag) {
+  if (!window.confirm(`Xoá thẻ “${tag.name}”? Các giao dịch đã ghi vẫn giữ nguyên tên thẻ.`)) return
+  error.value = ''
+  try {
+    await deleteTag(tag.id)
+    tags.value = tags.value.filter((item) => item.id !== tag.id)
+    if (selectedTag.value === tag.name) selectedTag.value = null
+    if (editingTagId.value === tag.id) cancelTagEdit()
+  } catch (e) {
+    error.value = 'Không thể xoá thẻ. Thử lại.'
+  }
 }
 
 async function saveBalance() {
@@ -501,6 +611,7 @@ function closeDebtModal() {
 }
 
 function requestRemoveDebt(debt) {
+  debtDetailType.value = null
   confirmingDebt.value = debt
 }
 
@@ -516,12 +627,28 @@ async function confirmRemoveDebt() {
   const debt = confirmingDebt.value
   if (!debt) return
   confirmingDebt.value = null
-  debts.value = debts.value.filter((item) => item.id !== debt.id)
+  const isLent = debt.debt_type === 'lent'
+  const settlementAmount = Math.abs(Number(debt.amount)) * (isLent ? 1 : -1)
+  const settlementNote = isLent
+    ? `Thu hồi khoản cho nợ${debt.note ? `: ${debt.note}` : ''}`
+    : `Thanh toán nợ${debt.note ? `: ${debt.note}` : ''}`
+  let settlementEntry = null
   try {
+    settlementEntry = await addEntry(settlementAmount, settlementNote, 'bank', null, 'transaction', false)
     await deleteDebt(debt.id)
+    entries.value = [settlementEntry, ...entries.value]
+    debts.value = debts.value.filter((item) => item.id !== debt.id)
+    currentPage.value = 1
+    todayPage.value = 1
   } catch (e) {
-    error.value = 'Không xoá được khoản nợ trên máy chủ.'
-    load()
+    if (settlementEntry) {
+      try {
+        await deleteEntry(settlementEntry.id)
+      } catch (rollbackError) {
+        await load()
+      }
+    }
+    error.value = 'Không thể tất toán khoản nợ. Số dư và khoản nợ được giữ nguyên.'
   }
 }
 
@@ -545,6 +672,10 @@ async function confirmRemove() {
 
 function fmt(n) {
   return new Intl.NumberFormat('vi-VN').format(n)
+}
+
+function isCountedTowardDaily(entry) {
+  return entry.entry_type !== 'adjustment' && entry.counts_toward_daily !== false
 }
 
 function accountLabel(accountType) {
@@ -604,6 +735,7 @@ const detailVisibleRange = computed(() => {
 
 <template>
   <div v-if="authLoading" class="auth-loading">Đang kiểm tra đăng nhập…</div>
+  <div v-else-if="localAuthError" class="auth-loading auth-error" role="alert">{{ localAuthError }}</div>
   <Login v-else-if="!session" />
   <div v-else class="page">
     <div class="passbook">
@@ -616,7 +748,7 @@ const detailVisibleRange = computed(() => {
           <div class="head-text">
             <div class="head-meta">
               <p class="eyebrow">{{ currentDate }}</p>
-              <button type="button" class="sign-out-btn" @click="handleSignOut">Đăng xuất</button>
+              <button v-if="!isLocalEnvironment" type="button" class="sign-out-btn" @click="handleSignOut">Đăng xuất</button>
             </div>
             <h1>DMoney</h1>
           </div>
@@ -701,16 +833,21 @@ const detailVisibleRange = computed(() => {
             </button>
           </fieldset>
           <fieldset class="choice-group tag-choice">
-            <legend>Thẻ <span>(tuỳ chọn)</span></legend>
+            <legend>Thẻ <span>(tuỳ chọn)</span><button type="button" class="manage-tags-btn" @click="openTagModal">Quản lý</button></legend>
             <button
               v-for="tag in tags"
-              :key="tag"
+              :key="tag.id"
               type="button"
-              :class="{ active: selectedTag === tag }"
-              @click="selectedTag = selectedTag === tag ? null : tag"
+              :class="{ active: selectedTag === tag.name }"
+              @click="selectedTag = selectedTag === tag.name ? null : tag.name"
             >
-              {{ tag }}
+              {{ tag.name }}
             </button>
+          </fieldset>
+          <fieldset class="choice-group daily-income-choice">
+            <legend>Tính vào thu nhập ngày</legend>
+            <button type="button" :class="{ active: countsTowardDaily }" @click="countsTowardDaily = true">Có</button>
+            <button type="button" :class="{ active: !countsTowardDaily }" @click="countsTowardDaily = false">Không</button>
           </fieldset>
           <button type="submit" class="add-btn">Ghi sổ</button>
         </form>
@@ -774,6 +911,7 @@ const detailVisibleRange = computed(() => {
                       <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
                       <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
                       <span v-if="row.entry_type === 'adjustment'" class="adjustment-badge">Điều chỉnh</span>
+                      <span v-else-if="row.counts_toward_daily === false" class="daily-excluded-badge">Không tính ngày</span>
                   </span>
                 </span>
                 <span class="row-time">{{ fmtTime(row.created_at) }}</span>
@@ -903,6 +1041,7 @@ const detailVisibleRange = computed(() => {
                     <span class="account-badge">{{ accountLabel(row.account_type) }}</span>
                     <span v-if="row.tag" class="tag-badge">{{ row.tag }}</span>
                     <span v-if="row.entry_type === 'adjustment'" class="adjustment-badge">Điều chỉnh</span>
+                    <span v-else-if="row.counts_toward_daily === false" class="daily-excluded-badge">Không tính ngày</span>
                     </span>
                   </span>
                   <span class="row-time">{{ fmtTime(row.created_at) }}</span>
@@ -962,15 +1101,16 @@ const detailVisibleRange = computed(() => {
     </div>
     <div v-if="confirmingDebt" class="dialog-backdrop" @click.self="cancelRemoveDebt">
       <section class="confirm-dialog debt-confirm-dialog" role="alertdialog" aria-modal="true">
-        <h2>Xoá khoản nợ?</h2>
+        <h2>Thanh toán khoản nợ?</h2>
         <p>
           {{ confirmingDebt.note || 'Khoản nợ không có ghi chú' }} ·
           {{ confirmingDebt.amount < 0 ? '' : '+' }}{{ fmt(confirmingDebt.amount) }}.
-          Thao tác này không thể hoàn tác.
+          {{ confirmingDebt.debt_type === 'lent' ? 'Tiền sẽ được cộng vào Tài khoản' : 'Tiền sẽ được trừ khỏi Tài khoản' }}
+          và không tính vào thu nhập ngày.
         </p>
         <div class="dialog-actions">
           <button type="button" class="cancel-delete-btn" @click="cancelRemoveDebt">Huỷ</button>
-          <button type="button" class="confirm-delete-btn" @click="confirmRemoveDebt">Xoá</button>
+          <button type="button" class="confirm-delete-btn" @click="confirmRemoveDebt">Thanh toán</button>
         </div>
       </section>
     </div>
@@ -980,7 +1120,7 @@ const detailVisibleRange = computed(() => {
           <h2>{{ debtDetailType === 'lent' ? 'Người khác đang nợ tôi' : 'Nợ hiện tại' }}</h2>
           <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeDebtDetails">×</button>
         </div>
-        <p>{{ visibleDebtDetails.length ? 'Chạm vào một dòng để xoá khoản nợ.' : 'Chưa có khoản nào.' }}</p>
+        <p>{{ visibleDebtDetails.length ? 'Chạm vào một dòng để thanh toán khoản nợ.' : 'Chưa có khoản nào.' }}</p>
         <div v-if="visibleDebtDetails.length" class="debt-list debt-details-list">
           <button v-for="debt in visibleDebtDetails" :key="debt.id" type="button" class="debt-row" @click="requestRemoveDebt(debt)">
             <span class="debt-date">{{ new Date(debt.created_at).toLocaleDateString('vi-VN') }}</span>
@@ -1017,6 +1157,33 @@ const detailVisibleRange = computed(() => {
         </form>
       </section>
     </div>
+    <div v-if="tagModalOpen" class="dialog-backdrop" @click.self="closeTagModal">
+      <section class="confirm-dialog tag-dialog" role="dialog" aria-modal="true" aria-labelledby="tag-dialog-title">
+        <div class="debt-details-heading">
+          <h2 id="tag-dialog-title">Quản lý thẻ</h2>
+          <button type="button" class="close-details-btn" aria-label="Đóng" @click="closeTagModal">×</button>
+        </div>
+        <form class="tag-add-form" @submit.prevent="submitTag">
+          <input v-model="tagInput" class="note-input" type="text" placeholder="Tên thẻ mới" aria-label="Tên thẻ mới" />
+          <button type="submit" class="save-balance-btn">Thêm</button>
+        </form>
+        <p v-if="error" class="debt-modal-error">{{ error }}</p>
+        <div class="tag-list">
+          <div v-for="tag in tags" :key="tag.id" class="tag-list-row">
+            <template v-if="editingTagId === tag.id">
+              <input v-model="editingTagName" class="note-input" type="text" :aria-label="`Tên thẻ ${tag.name}`" @keyup.enter="saveTag(tag)" />
+              <button type="button" class="tag-action-btn" @click="saveTag(tag)">Lưu</button>
+              <button type="button" class="tag-action-btn" @click="cancelTagEdit">Huỷ</button>
+            </template>
+            <template v-else>
+              <span>{{ tag.name }}</span>
+              <button type="button" class="tag-action-btn" @click="startTagEdit(tag)">Sửa</button>
+              <button type="button" class="tag-action-btn tag-delete-btn" @click="removeTag(tag)">Xoá</button>
+            </template>
+          </div>
+        </div>
+      </section>
+    </div>
     <div v-if="detailTitle" class="dialog-backdrop" @click.self="closeDetails">
       <section class="confirm-dialog detail-dialog" role="dialog" aria-modal="true">
         <div class="debt-details-heading">
@@ -1025,7 +1192,7 @@ const detailVisibleRange = computed(() => {
         </div>
         <div class="detail-list">
           <button v-for="row in paginatedDetailRows" :key="row.id" type="button" class="row" @click="openEntryDetail(row)">
-            <span class="row-note">{{ row.note || '—' }} <span class="row-meta"><span class="account-badge">{{ accountLabel(row.account_type) }}</span><span v-if="row.tag" class="tag-badge">{{ row.tag }}</span></span></span>
+            <span class="row-note">{{ row.note || '—' }} <span class="row-meta"><span class="account-badge">{{ accountLabel(row.account_type) }}</span><span v-if="row.tag" class="tag-badge">{{ row.tag }}</span><span v-if="row.counts_toward_daily === false" class="daily-excluded-badge">Không tính ngày</span></span></span>
             <span class="row-time">{{ fmtTime(row.created_at) }}</span>
             <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">{{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}</span>
             <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
@@ -1384,6 +1551,15 @@ const detailVisibleRange = computed(() => {
 .choice-group legend span {
   font-size: 10px;
 }
+.choice-group .manage-tags-btn {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--brass);
+  font: inherit;
+  cursor: pointer;
+}
 .choice-group button {
   border: 1px solid var(--rule-strong);
   border-radius: 999px;
@@ -1609,6 +1785,13 @@ const detailVisibleRange = computed(() => {
 .detail-dialog { width: min(100%, 470px); max-height: min(78vh, 620px); display: flex; flex-direction: column; }
 .detail-list { overflow-y: auto; }
 .detail-list .row { flex: 0 0 auto; }
+.tag-dialog { width: min(100%, 400px); }
+.tag-add-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 14px 0; }
+.tag-list { display: grid; max-height: 330px; overflow-y: auto; border-top: 1px solid var(--rule); }
+.tag-list-row { display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 7px; min-height: 42px; border-bottom: 1px solid var(--rule); color: var(--ink); font: 13px 'Inter', sans-serif; }
+.tag-list-row .note-input { padding: 7px 8px; font-size: 12px; }
+.tag-action-btn { border: 1px solid var(--rule-strong); border-radius: 4px; padding: 5px 7px; background: var(--paper-card); color: var(--ink-faint); font: 11px 'Inter', sans-serif; cursor: pointer; }
+.tag-delete-btn { color: var(--red); }
 .entry-detail-dialog { width: min(100%, 340px); }
 .entry-detail-amount { margin: 18px 0 8px; font: 600 25px 'JetBrains Mono', monospace; }
 .entry-detail-note { margin: 0; padding: 10px 0 4px; border-top: 1px solid var(--rule); color: var(--ink); font: 14px/1.5 'Inter', sans-serif; }
@@ -1685,6 +1868,7 @@ const detailVisibleRange = computed(() => {
   border-color: rgba(156, 122, 60, 0.55);
   color: var(--brass);
 }
+.daily-excluded-badge { color: var(--ink-faint); font-size: 9px; }
 .row-time {
   font-family: 'JetBrains Mono', monospace;
   font-size: 11px;
