@@ -19,6 +19,9 @@ const editingTagId = ref(null)
 const editingTagName = ref('')
 const entryDirection = ref(-1)
 const countsTowardDaily = ref(true)
+const balancesHidden = ref(false)
+const dailyInfoOpen = ref(false)
+const dailyInfoRef = ref(null)
 const debtInput = ref('')
 const debtNote = ref('')
 const debtDirection = ref(1)
@@ -59,9 +62,16 @@ const defaultTagNames = ['Ăn uống', 'Di chuyển', 'Mua sắm', 'Hoá đơn',
 const isLocalEnvironment = import.meta.env.VITE_APP_ENV === 'local'
 
 let authSubscription
+let dailyInfoTimer
 
 onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
+  document.addEventListener('pointerdown', handleOutsidePointerDown)
+  try {
+    balancesHidden.value = localStorage.getItem('dmoney-balances-hidden') === 'true'
+  } catch (e) {
+    // Giữ trạng thái mặc định nếu trình duyệt chặn localStorage.
+  }
   try {
     session.value = isLocalEnvironment ? await getLocalSession() : await getSession()
     if (session.value) await load()
@@ -93,7 +103,9 @@ onMounted(async () => {
 
 onUnmounted(() => {
   authSubscription?.unsubscribe()
+  clearTimeout(dailyInfoTimer)
   document.removeEventListener('keydown', handleKeydown)
+  document.removeEventListener('pointerdown', handleOutsidePointerDown)
 })
 
 async function getLocalSession() {
@@ -279,6 +291,12 @@ const todayRows = computed(() => withBalance.value.filter((row) => isSameUtcDay(
 const dailyBalance = computed(() => todayRows.value
   .filter(isCountedTowardDaily)
   .reduce((total, row) => total + Number(row.amount), 0))
+const dailyIncome = computed(() => todayRows.value
+  .filter((row) => isCountedTowardDaily(row) && Number(row.amount) > 0)
+  .reduce((total, row) => total + Number(row.amount), 0))
+const dailyExpense = computed(() => todayRows.value
+  .filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0)
+  .reduce((total, row) => total + Math.abs(Number(row.amount)), 0))
 const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
 const lentDebts = computed(() => debts.value.filter((debt) => debt.debt_type === 'lent'))
 const currentMonthDebt = computed(() => owedDebts.value
@@ -718,9 +736,38 @@ function resetDateSearch() {
   dateTo.value = ''
 }
 
+function toggleBalances() {
+  balancesHidden.value = !balancesHidden.value
+  try {
+    localStorage.setItem('dmoney-balances-hidden', String(balancesHidden.value))
+  } catch (e) {
+    // Việc ẩn/hiện vẫn hoạt động trong phiên hiện tại.
+  }
+}
+
+function closeDailyInfo() {
+  dailyInfoOpen.value = false
+  clearTimeout(dailyInfoTimer)
+}
+
+function toggleDailyInfo() {
+  if (dailyInfoOpen.value) {
+    closeDailyInfo()
+    return
+  }
+  dailyInfoOpen.value = true
+  clearTimeout(dailyInfoTimer)
+  dailyInfoTimer = setTimeout(closeDailyInfo, 3000)
+}
+
+function handleOutsidePointerDown(event) {
+  if (dailyInfoOpen.value && !dailyInfoRef.value?.contains(event.target)) closeDailyInfo()
+}
+
 function handleKeydown(event) {
   if (event.key !== 'Escape') return
-  if (selectedEntryDetail.value) closeEntryDetail()
+  if (dailyInfoOpen.value) closeDailyInfo()
+  else if (selectedEntryDetail.value) closeEntryDetail()
   else if (detailTitle.value) closeDetails()
 }
 
@@ -754,20 +801,40 @@ const detailVisibleRange = computed(() => {
           </div>
           <div class="balance-controls">
             <div class="balance-stamps" aria-label="Số dư theo nguồn tiền">
-              <div class="balance-total" :class="{ negative: currentBalance < 0 }">
+              <div class="balance-total" :class="{ negative: !balancesHidden && currentBalance < 0 }">
                 <div class="balance-total-topline">
                   <span class="balance-total-label">Tổng số dư</span>
-                  <button
-                    type="button"
-                    class="edit-balance-btn"
-                    aria-label="Điều chỉnh số dư"
-                    title="Điều chỉnh số dư"
-                    @click="startBalanceEdit"
-                  >
-                    <span aria-hidden="true">✎</span>
-                  </button>
+                  <div class="balance-actions">
+                    <button
+                      type="button"
+                      class="balance-visibility-btn"
+                      :aria-label="balancesHidden ? 'Hiện số dư' : 'Ẩn số dư'"
+                      :aria-pressed="balancesHidden"
+                      :title="balancesHidden ? 'Hiện số dư' : 'Ẩn số dư'"
+                      @click="toggleBalances"
+                    >
+                      <svg v-if="balancesHidden" aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M3 3l18 18M10.6 10.7a2 2 0 0 0 2.7 2.7M9.9 4.2A10.8 10.8 0 0 1 12 4c5.5 0 9 5.5 9 5.5a15.8 15.8 0 0 1-2.1 2.7M6.6 6.6A17.2 17.2 0 0 0 3 9.5S6.5 15 12 15c1 0 2-.2 2.8-.5" />
+                      </svg>
+                      <svg v-else aria-hidden="true" viewBox="0 0 24 24">
+                        <path d="M3 9.5S6.5 4 12 4s9 5.5 9 5.5S17.5 15 12 15 3 9.5 3 9.5Z" />
+                        <circle cx="12" cy="9.5" r="2.5" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      class="edit-balance-btn"
+                      aria-label="Điều chỉnh số dư"
+                      title="Điều chỉnh số dư"
+                      @click="startBalanceEdit"
+                    >
+                      <span aria-hidden="true">✎</span>
+                    </button>
+                  </div>
                 </div>
-                <strong class="balance-total-amount">{{ fmt(currentBalance) }} <small>₫</small></strong>
+                <strong class="balance-total-amount" :class="{ masked: balancesHidden }">
+                  {{ balancesHidden ? '••••••' : fmt(currentBalance) }} <small>₫</small>
+                </strong>
               </div>
               <div class="balance-source-stamps">
                 <div
@@ -775,24 +842,24 @@ const detailVisibleRange = computed(() => {
                   :key="account.value"
                   class="balance-source"
                   :class="account.value"
-                  :aria-label="`${account.label}: ${fmt(balancesByAccount[account.value])} đồng`"
+                  :aria-label="balancesHidden ? `${account.label}: số dư đang được ẩn` : `${account.label}: ${fmt(balancesByAccount[account.value])} đồng`"
                 >
                   <span class="balance-source-icon" aria-hidden="true"></span>
                   <span class="balance-source-label">{{ account.label }}</span>
-                  <strong class="balance-source-amount" :class="{ negative: balancesByAccount[account.value] < 0 }">
-                    {{ fmt(balancesByAccount[account.value]) }} <small>₫</small>
+                  <strong class="balance-source-amount" :class="{ negative: !balancesHidden && balancesByAccount[account.value] < 0, masked: balancesHidden }">
+                    {{ balancesHidden ? '••••••' : fmt(balancesByAccount[account.value]) }} <small>₫</small>
                   </strong>
                 </div>
               </div>
             </div>
             <section class="debt-card" aria-label="Theo dõi nợ">
-              <button type="button" class="debt-summary debt-total-button" @click="debtDetailType = 'lent'">
+              <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Đang cho nợ: số tiền đang được ẩn' : `Đang cho nợ: ${fmt(currentLent)} đồng`" @click="debtDetailType = 'lent'">
                 <span>Đang cho nợ</span>
-                <strong>{{ fmt(currentLent) }} <small>₫</small></strong>
+                <strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : fmt(currentLent) }} <small>₫</small></strong>
               </button>
-              <button type="button" class="debt-summary debt-total-button" @click="debtDetailType = 'owed'">
+              <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Nợ hiện tại: số tiền đang được ẩn' : `Nợ hiện tại: ${fmt(currentDebt)} đồng`" @click="debtDetailType = 'owed'">
                 <span>Nợ hiện tại</span>
-                <strong>{{ fmt(currentDebt) }} <small>₫</small></strong>
+                <strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : fmt(currentDebt) }} <small>₫</small></strong>
               </button>
               <button type="button" class="debt-add-btn debt-open-btn" @click="openDebtModal">+ Ghi khoản nợ</button>
             </section>
@@ -800,28 +867,22 @@ const detailVisibleRange = computed(() => {
         </header>
 
         <form class="entry-form" @submit.prevent="submit">
-          <input
-            v-model="input"
-            class="amount-input"
-            type="text"
-            inputmode="numeric"
-            placeholder="Vnd"
-            aria-label="Số tiền"
-          />
-          <input
-            v-model="note"
-            class="note-input"
-            type="text"
-            placeholder="Note (tuỳ chọn)"
-            aria-label="Ghi chú"
-          />
-          <fieldset class="choice-group amount-direction">
-            <legend>Loại tiền</legend>
-            <button type="button" :class="{ active: entryDirection === -1 }" @click="entryDirection = -1">− Chi</button>
-            <button type="button" :class="{ active: entryDirection === 1 }" @click="entryDirection = 1">+ Thu</button>
-          </fieldset>
-          <fieldset class="choice-group account-choice">
-            <legend>Nguồn tiền</legend>
+          <div class="amount-row">
+            <input
+              v-model="input"
+              class="amount-input"
+              :class="entryDirection === -1 ? 'expense-input' : 'income-input'"
+              type="text"
+              inputmode="numeric"
+              placeholder="Số tiền"
+              aria-label="Số tiền"
+            />
+            <div class="entry-direction" aria-label="Loại giao dịch">
+              <button type="button" :class="{ active: entryDirection === -1 }" @click="entryDirection = -1">− Chi</button>
+              <button type="button" :class="{ active: entryDirection === 1 }" @click="entryDirection = 1">+ Thu</button>
+            </div>
+          </div>
+          <div class="choice-group account-choice" role="group" aria-label="Nguồn tiền">
             <button
               v-for="account in accountTypes"
               :key="account.value"
@@ -831,7 +892,23 @@ const detailVisibleRange = computed(() => {
             >
               {{ account.label }}
             </button>
-          </fieldset>
+          </div>
+          <div class="note-daily-row">
+            <input
+              v-model="note"
+              class="note-input"
+              type="text"
+              placeholder="Note (tuỳ chọn)"
+              aria-label="Ghi chú"
+            />
+            <div ref="dailyInfoRef" class="daily-toggle-control">
+              <label class="daily-toggle">
+                <span class="daily-toggle-text">Tính thu nhập ngày</span>
+                <input v-model="countsTowardDaily" type="checkbox" role="switch" aria-label="Tính giao dịch vào thu nhập ngày" />
+                <span class="toggle-track" aria-hidden="true"><span></span></span>
+              </label>
+            </div>
+          </div>
           <fieldset class="choice-group tag-choice">
             <legend>Thẻ <span>(tuỳ chọn)</span><button type="button" class="manage-tags-btn" @click="openTagModal">Quản lý</button></legend>
             <button
@@ -843,11 +920,6 @@ const detailVisibleRange = computed(() => {
             >
               {{ tag.name }}
             </button>
-          </fieldset>
-          <fieldset class="choice-group daily-income-choice">
-            <legend>Tính vào thu nhập ngày</legend>
-            <button type="button" :class="{ active: countsTowardDaily }" @click="countsTowardDaily = true">Có</button>
-            <button type="button" :class="{ active: !countsTowardDaily }" @click="countsTowardDaily = false">Không</button>
           </fieldset>
           <button type="submit" class="add-btn">Ghi sổ</button>
         </form>
@@ -884,9 +956,16 @@ const detailVisibleRange = computed(() => {
           <template v-if="activeView === 'today'">
             <div class="daily-balance">
               <span>Thu nhập ngày</span>
-              <strong :class="dailyBalance < 0 ? 'neg' : 'pos'">
-                {{ dailyBalance < 0 ? '' : '+' }}{{ fmt(dailyBalance) }}
-              </strong>
+              <span class="daily-balance-values">
+                <strong :class="dailyBalance < 0 ? 'neg' : 'pos'">
+                  {{ dailyBalance < 0 ? '' : '+' }}{{ fmt(dailyBalance) }}
+                </strong>
+                <span class="daily-breakdown">
+                  <small class="pos">Thu {{ fmt(dailyIncome) }}</small>
+                  <span aria-hidden="true">·</span>
+                  <small class="neg">Chi {{ fmt(dailyExpense) }}</small>
+                </span>
+              </span>
             </div>
             <div v-if="!todayRows.length" class="empty">
               Hôm nay chưa có giao dịch nào.
@@ -1048,7 +1127,7 @@ const detailVisibleRange = computed(() => {
                   <span class="row-amount" :class="[row.amount < 0 ? 'neg' : 'pos', { adjustment: row.entry_type === 'adjustment' }]">
                     {{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}
                   </span>
-                  <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
+                  <span class="row-balance" :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : fmt(row.accountBalance) }}</span>
                 </button>
               </div>
               <nav v-if="false" class="pagination" aria-label="Phân trang giao dịch">
@@ -1195,7 +1274,7 @@ const detailVisibleRange = computed(() => {
             <span class="row-note">{{ row.note || '—' }} <span class="row-meta"><span class="account-badge">{{ accountLabel(row.account_type) }}</span><span v-if="row.tag" class="tag-badge">{{ row.tag }}</span><span v-if="row.counts_toward_daily === false" class="daily-excluded-badge">Không tính ngày</span></span></span>
             <span class="row-time">{{ fmtTime(row.created_at) }}</span>
             <span class="row-amount" :class="row.amount < 0 ? 'neg' : 'pos'">{{ row.amount < 0 ? '' : '+' }}{{ fmt(row.amount) }}</span>
-            <span class="row-balance">{{ fmt(row.accountBalance) }}</span>
+            <span class="row-balance" :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : fmt(row.accountBalance) }}</span>
           </button>
         </div>
         <nav v-if="detailRows.length > pageSize" class="pagination"><span>{{ detailVisibleRange }}</span><div class="pagination-controls"><button type="button" :disabled="detailPage === 1" @click="detailPage -= 1">Trước</button><span>{{ detailPage }} / {{ detailTotalPages }}</span><button type="button" :disabled="detailPage === detailTotalPages" @click="detailPage += 1">Sau</button></div></nav>
@@ -1342,6 +1421,41 @@ const detailVisibleRange = computed(() => {
   justify-content: space-between;
   gap: 12px;
 }
+.balance-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.balance-visibility-btn {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  margin: -7px -5px -7px 0;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--brass);
+  cursor: pointer;
+}
+.balance-visibility-btn:hover,
+.balance-visibility-btn:focus-visible {
+  background: rgba(156, 122, 60, 0.12);
+}
+.balance-visibility-btn:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 1px;
+}
+.balance-visibility-btn svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
 .balance-total-amount {
   font-family: 'JetBrains Mono', monospace;
   font-size: 25px;
@@ -1354,6 +1468,14 @@ const detailVisibleRange = computed(() => {
   font-weight: 500;
   letter-spacing: 0;
 }
+.masked {
+  display: inline-block;
+  color: var(--ink-faint) !important;
+  letter-spacing: 0.04em;
+}
+.balance-total-amount { min-width: 152px; }
+.balance-source-amount { min-width: 84px; }
+.debt-summary strong { min-width: 104px; text-align: right; }
 .balance-source-stamps {
   padding: 0 14px;
   background: rgba(251, 249, 243, 0.72);
@@ -1527,15 +1649,65 @@ const detailVisibleRange = computed(() => {
 
 .entry-form {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  gap: 7px;
   margin-bottom: 6px;
 }
+.amount-row,
+.note-daily-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.amount-row .amount-input,
+.note-daily-row .note-input {
+  flex: 1;
+}
+.entry-direction {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 4px;
+}
+.entry-direction button,
+.choice-group button {
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  padding: 5px 8px;
+  background: var(--paper-card);
+  color: var(--ink-faint);
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  cursor: pointer;
+}
+.entry-direction button.active,
+.choice-group button.active {
+  border-color: var(--brass);
+  background: rgba(156, 122, 60, 0.12);
+  color: var(--ink);
+  font-weight: 600;
+}
+.entry-direction button:first-child.active {
+  border-color: var(--red);
+  background: rgba(161, 45, 39, 0.1);
+  color: var(--red);
+}
+.entry-direction button:last-child.active {
+  border-color: var(--green);
+  background: rgba(23, 107, 69, 0.1);
+  color: var(--green);
+}
+.amount-row .amount-input.expense-input:focus {
+  border-color: var(--red);
+  color: var(--red);
+}
+.amount-row .amount-input.income-input:focus {
+  border-color: var(--green);
+  color: var(--green);
+}
 .choice-group {
-  grid-column: 1 / -1;
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
   margin: 0;
   padding: 0;
@@ -1543,7 +1715,7 @@ const detailVisibleRange = computed(() => {
 }
 .choice-group legend {
   width: 100%;
-  margin-bottom: 3px;
+  margin-bottom: 2px;
   font-family: 'Inter', sans-serif;
   font-size: 11px;
   color: var(--ink-faint);
@@ -1560,21 +1732,107 @@ const detailVisibleRange = computed(() => {
   font: inherit;
   cursor: pointer;
 }
-.choice-group button {
+.account-choice {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+.choice-label {
+  flex: 0 0 auto;
+  margin-right: 2px;
+  color: var(--ink-faint);
+  font: 11px 'Inter', sans-serif;
+}
+.account-choice button,
+.tag-choice button {
+  padding: 4px 7px;
+}
+.note-daily-row {
+  align-items: stretch;
+}
+.daily-toggle-control {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: stretch;
+  gap: 3px;
+}
+.daily-toggle {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 8px;
   border: 1px solid var(--rule-strong);
   border-radius: 999px;
-  padding: 5px 8px;
-  background: var(--paper-card);
   color: var(--ink-faint);
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
+  font: 10px 'Inter', sans-serif;
   cursor: pointer;
+  white-space: nowrap;
 }
-.choice-group button.active {
-  border-color: var(--brass);
-  background: rgba(156, 122, 60, 0.12);
+.daily-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.toggle-track {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 999px;
+  background: var(--rule-strong);
+  transition: background .2s ease;
+}
+.toggle-track span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--paper-card);
+  box-shadow: 0 1px 2px rgba(43, 42, 40, 0.22);
+  transition: transform .2s ease;
+}
+.daily-toggle input:checked + .toggle-track {
+  background: var(--brass);
+}
+.daily-toggle input:checked + .toggle-track span {
+  transform: translateX(12px);
+}
+.daily-toggle input:focus-visible + .toggle-track {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+.daily-info-btn {
+  display: grid;
+  width: 28px;
+  min-height: 100%;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--rule-strong);
+  border-radius: 50%;
+  background: var(--paper-card);
+  color: var(--brass);
+  cursor: pointer;
+  font: 700 12px/1 'Newsreader', serif;
+}
+.daily-info-btn:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+}
+.daily-info-tooltip {
+  position: absolute;
+  z-index: 2;
+  top: calc(100% + 6px);
+  right: 0;
+  width: min(250px, calc(100vw - 48px));
+  padding: 8px 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 6px;
+  background: var(--paper-card);
+  box-shadow: 0 8px 20px rgba(43, 42, 40, 0.16);
   color: var(--ink);
-  font-weight: 600;
+  font: 11px/1.4 'Inter', sans-serif;
 }
 .amount-input,
 .note-input {
@@ -1598,12 +1856,11 @@ const detailVisibleRange = computed(() => {
   border-color: var(--brass);
 }
 .add-btn {
-  grid-column: 1 / -1;
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   font-size: 13px;
   letter-spacing: 0.02em;
-  padding: 10px;
+  padding: 8px 10px;
   border: none;
   border-radius: 4px;
   background: var(--ink);
@@ -1722,7 +1979,7 @@ const detailVisibleRange = computed(() => {
 }
 .daily-balance {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
   padding: 10px 2px;
@@ -1733,7 +1990,32 @@ const detailVisibleRange = computed(() => {
 }
 .daily-balance strong {
   font-family: 'JetBrains Mono', monospace;
-  font-size: 16px;
+  font-size: 17px;
+  font-weight: 700;
+}
+.daily-balance-values {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+  text-align: right;
+}
+.daily-breakdown {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 5px;
+  color: var(--ink-faint);
+  font: 10px 'JetBrains Mono', monospace;
+}
+.daily-breakdown small {
+  font: inherit;
+  font-weight: 600;
+}
+.pos {
+  color: var(--green);
+}
+.neg {
+  color: var(--red);
 }
 .search-field {
   display: grid;
@@ -1882,12 +2164,6 @@ const detailVisibleRange = computed(() => {
   min-width: 78px;
   text-align: right;
 }
-.row-amount.neg {
-  color: var(--red);
-}
-.row-amount.pos {
-  color: var(--green);
-}
 .row-amount.adjustment { color: var(--ink-faint); }
 .adjustment-badge { color: var(--ink-faint); font-size: 9px; }
 .row-balance {
@@ -1971,9 +2247,65 @@ const detailVisibleRange = computed(() => {
   color: var(--paper-card);
 }
 
-@media (max-width: 380px) {
+@media (max-width: 480px) {
+  .page {
+    padding: 12px 6px;
+  }
+  .spine {
+    width: 18px;
+  }
+  .sheet {
+    padding: 20px 14px 16px;
+  }
+  .head {
+    margin-bottom: 12px;
+  }
   .head h1 {
     font-size: 22px;
+  }
+  .entry-form {
+    gap: 6px;
+  }
+  .amount-input,
+  .note-input {
+    padding: 9px 10px;
+  }
+  .entry-direction button {
+    padding: 4px 6px;
+  }
+  .account-choice {
+    gap: 3px;
+  }
+  .choice-label {
+    margin-right: 0;
+    font-size: 10px;
+  }
+  .account-choice button {
+    flex: 1;
+    padding-right: 5px;
+    padding-left: 5px;
+    font-size: 10px;
+  }
+  .tag-choice {
+    gap: 3px;
+  }
+  .tag-choice button {
+    padding: 3px 6px;
+    font-size: 10px;
+  }
+  .daily-toggle {
+    padding-right: 7px;
+    padding-left: 7px;
+  }
+  .daily-info-btn {
+    width: 26px;
+  }
+  .daily-balance {
+    gap: 8px;
+  }
+  .daily-breakdown {
+    gap: 4px;
+    font-size: 9px;
   }
   .pagination {
     align-items: flex-start;
