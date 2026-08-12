@@ -31,6 +31,14 @@ defineEmits(['close', 'update:appearance', 'open-tag-manager', 'sign-out'])
             <span class="appearance-preview" aria-hidden="true"><i></i><i></i><i></i></span>
             <span><strong>Hiện đại</strong><small>Dashboard sáng, thẻ nổi và điểm nhấn tím.</small></span>
           </button>
+          <button type="button" class="appearance-option midnight-option" :class="{ active: appearance === 'midnight' }" role="radio" :aria-checked="appearance === 'midnight'" @click="$emit('update:appearance', 'midnight')">
+            <span class="appearance-preview" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span><strong>Đêm neon</strong><small>Nền tối, biểu đồ rực sáng và bố cục dữ liệu tập trung.</small></span>
+          </button>
+          <button type="button" class="appearance-option breeze-option" :class="{ active: appearance === 'breeze' }" role="radio" :aria-checked="appearance === 'breeze'" @click="$emit('update:appearance', 'breeze')">
+            <span class="appearance-preview" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span><strong>Thoáng</strong><small>Tông xanh dịu, giao diện sáng và tối giản.</small></span>
+          </button>
         </div>
       </section>
 

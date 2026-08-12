@@ -1,0 +1,72 @@
+.appearance-modern {
+  --ink: #172033;
+  --ink-faint: #64748b;
+  --rule: #e2e8f0;
+  --rule-strong: #cbd5e1;
+  --brass: #2563eb;
+  --red: #dc2626;
+  --green: #047857;
+  min-height: 100vh;
+  background: #f1f5f9;
+  font-family: var(--font-ui);
+}
+.appearance-modern .passbook { max-width: 1180px; border: 0; border-radius: 0; background: transparent; box-shadow: none; overflow: visible; }
+.appearance-modern .spine { display: none; }
+.appearance-modern .sheet { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 24px; padding: 28px; }
+.appearance-modern .head { grid-column: 1; grid-row: 1 / span 4; margin: 0; }
+.appearance-modern .head-text { padding: 20px 18px; border-radius: 18px 18px 0 0; background: #172033; color: #fff; }
+.appearance-modern .head h1 { color: #fff; font-family: var(--font-ui); font-size: 30px; letter-spacing: -0.06em; }
+.appearance-modern .eyebrow { color: #93c5fd; font-family: var(--font-ui); }
+.appearance-modern .settings-btn { border-color: #334155; background: #1e293b; color: #e2e8f0; font-family: var(--font-ui); }
+.appearance-modern .balance-controls { display: block; }
+.appearance-modern .balance-stamps { border: 0; border-radius: 0; background: #172033; color: #fff; }
+.appearance-modern .balance-total { padding: 8px 18px 18px; color: #fff; }
+.appearance-modern .balance-total-label { color: #93c5fd; }
+.appearance-modern .balance-total-amount, .appearance-modern .balance-source-amount, .appearance-modern .debt-summary strong, .appearance-modern .row-amount, .appearance-modern .row-balance { font-family: var(--font-number); letter-spacing: -0.04em; }
+.appearance-modern .balance-source-stamps { background: #1e293b; }
+.appearance-modern .balance-source { grid-template-columns: 24px 1fr; gap: 3px 7px; }
+.appearance-modern .balance-source:not(:last-child)::after { background: #334155; }
+.appearance-modern .balance-source-icon { width: 24px; height: 24px; background: #334155; }
+.appearance-modern .balance-source-icon::before { color: #bfdbfe; }
+.appearance-modern .balance-source-label { color: #cbd5e1; font-family: var(--font-ui); }
+.appearance-modern .balance-source-amount { grid-column: 2; color: #fff; font-weight: 700; }
+.appearance-modern .balance-visibility-btn { color: #bfdbfe; }
+.appearance-modern .balance-total.negative { color: #fca5a5; }
+.appearance-modern .debt-card { border: 0; border-radius: 0 0 18px 18px; background: #fff; box-shadow: none; }
+.appearance-modern .debt-summary { color: #475569; font-family: var(--font-ui); }
+.appearance-modern .debt-summary strong { color: #172033; }
+.appearance-modern .debt-add-btn { border-radius: 8px; background: #2563eb; font-family: var(--font-ui); }
+.appearance-modern .entry-form { grid-column: 2; grid-row: 1; padding: 22px; border: 1px solid #dbe3ef; border-radius: 18px; background: #fff; box-shadow: 0 10px 24px rgba(15, 23, 42, .06); }
+.appearance-modern .amount-input, .appearance-modern .note-input { background: #f8fafc; font-family: var(--font-ui); }
+.appearance-modern .amount-input:focus, .appearance-modern .note-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
+.appearance-modern .entry-direction button, .appearance-modern .choice-group button { font-family: var(--font-ui); }
+.appearance-modern .entry-direction button.active, .appearance-modern .choice-group button.active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
+.appearance-modern .entry-direction button:first-child.active { border-color: #dc2626; background: #fef2f2; color: #b91c1c; }
+.appearance-modern .add-btn, .appearance-modern .save-balance-btn { border-color: #2563eb; border-radius: 9px; background: #2563eb; font-family: var(--font-ui); }
+.appearance-modern .balance-form, .appearance-modern .error { grid-column: 2; }
+.appearance-modern .view-tabs { grid-column: 2; margin: 0; padding: 4px; border: 0; border-radius: 12px; background: #e2e8f0; }
+.appearance-modern .view-tabs button { border: 0; border-radius: 8px; font-family: var(--font-ui); }
+.appearance-modern .view-tabs button.active { border: 0; background: #fff; color: #1d4ed8; box-shadow: 0 2px 5px rgba(15, 23, 42, .08); }
+.appearance-modern .ledger { grid-column: 2; padding: 22px; border: 1px solid #dbe3ef; border-radius: 18px; background: #fff; }
+.appearance-modern .daily-balance { padding: 15px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #475569; font-family: var(--font-ui); }
+.appearance-modern .daily-balance strong { font-family: var(--font-number); }
+.appearance-modern .row { grid-template-columns: 34px minmax(0, 1fr) auto auto; gap: 10px; padding: 13px 8px; border-radius: 9px; }
+.appearance-modern .transaction-icon { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 9px; }
+.appearance-modern .transaction-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.appearance-modern .transaction-icon.expense { background: #fef2f2; color: #dc2626; }
+.appearance-modern .transaction-icon.income { background: #ecfdf5; color: #047857; }
+.appearance-modern .row-note { font-family: var(--font-ui); font-weight: 600; }
+.appearance-modern .row-time { font-family: var(--font-ui); }
+.appearance-modern .row-amount { min-width: 100px; font-size: 14px; font-weight: 750; }
+.appearance-modern .row:hover, .appearance-modern .day-summary-row:hover { background: #f8fafc; }
+.appearance-modern .account-badge, .appearance-modern .tag-badge { border-color: #cbd5e1; background: #f8fafc; color: #475569; font-family: var(--font-ui); }
+.appearance-modern .pos { color: #047857; }
+.appearance-modern .neg { color: #dc2626; }
+
+@media (max-width: 760px) {
+  .appearance-modern .sheet { display: block; padding: 16px; }
+  .appearance-modern .head { margin-bottom: 16px; }
+  .appearance-modern .entry-form { margin-bottom: 16px; }
+  .appearance-modern .view-tabs { margin-bottom: 0; }
+  .appearance-modern .ledger { border-radius: 0 0 14px 14px; }
+}
