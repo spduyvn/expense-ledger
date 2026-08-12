@@ -78,7 +78,7 @@ onMounted(async () => {
   try {
     balancesHidden.value = localStorage.getItem('dmoney-balances-hidden') === 'true'
     const savedAppearance = localStorage.getItem('dmoney-appearance')
-    if (savedAppearance === 'modern' || savedAppearance === 'ledger') appearance.value = savedAppearance
+    if (['ledger', 'modern', 'midnight', 'breeze'].includes(savedAppearance)) appearance.value = savedAppearance
   } catch (e) {
     // Giữ trạng thái mặc định nếu trình duyệt chặn localStorage.
   }

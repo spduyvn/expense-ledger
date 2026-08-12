@@ -1,0 +1,71 @@
+/* Giao diện Thoáng: thẻ sáng, khoảng trống rộng và tông xanh biển/xanh ngọc. */
+.appearance-breeze {
+  --paper: #f0fdfa;
+  --paper-card: #ffffff;
+  --paper-spine: #ccfbf1;
+  --ink: #134e4a;
+  --ink-faint: #5f7f7c;
+  --rule: #d6eeeb;
+  --rule-strong: #b8ddd7;
+  --brass: #0f766e;
+  --red: #e11d48;
+  --green: #047857;
+  min-height: 100vh;
+  background: linear-gradient(160deg, #ecfeff, #f0fdfa 55%, #eff6ff);
+  font-family: var(--font-ui);
+}
+.appearance-breeze .passbook { max-width: 1000px; border: 0; border-radius: 24px; background: rgba(255, 255, 255, .8); box-shadow: 0 18px 48px rgba(13, 148, 136, .13); }
+.appearance-breeze .spine { display: none; }
+.appearance-breeze .sheet { padding: 36px; }
+.appearance-breeze .head { display: grid; grid-template-columns: 1fr auto; gap: 20px; align-items: start; }
+.appearance-breeze .head-text { display: flex; flex-direction: column-reverse; gap: 10px; }
+.appearance-breeze .head h1 { color: #0f766e; font-family: var(--font-display); font-size: 42px; font-weight: 500; }
+.appearance-breeze .eyebrow { color: #0e7490; font-family: var(--font-ui); }
+.appearance-breeze .settings-btn { border-color: #b8ddd7; background: #fff; color: #0f766e; font-family: var(--font-ui); }
+.appearance-breeze .balance-controls { display: contents; }
+.appearance-breeze .balance-stamps { grid-column: 1 / -1; display: grid; grid-template-columns: 1.3fr 2fr; border: 0; border-radius: 18px; background: #0f766e; color: #fff; }
+.appearance-breeze .balance-total { justify-content: center; padding: 20px 24px; color: #fff; }
+.appearance-breeze .balance-total-label { color: #ccfbf1; }
+.appearance-breeze .balance-total-amount, .appearance-breeze .balance-source-amount, .appearance-breeze .debt-summary strong, .appearance-breeze .row-amount, .appearance-breeze .row-balance { font-family: var(--font-number); }
+.appearance-breeze .balance-source-stamps { align-self: stretch; background: rgba(255,255,255,.12); }
+.appearance-breeze .balance-source:not(:last-child)::after { background: rgba(255,255,255,.25); }
+.appearance-breeze .balance-source-icon { background: rgba(255,255,255,.16); }
+.appearance-breeze .balance-source-icon::before { color: #fff; }
+.appearance-breeze .balance-source-label, .appearance-breeze .balance-source-amount { color: #fff; font-family: var(--font-ui); }
+.appearance-breeze .balance-source-amount { font-family: var(--font-number); }
+.appearance-breeze .balance-visibility-btn { color: #ccfbf1; }
+.appearance-breeze .debt-card { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; border-color: #d6eeeb; border-radius: 14px; background: #fff; }
+.appearance-breeze .debt-total-button + .debt-total-button { margin: 0; border-left: 1px solid #d6eeeb; }
+.appearance-breeze .debt-summary { color: #5f7f7c; font-family: var(--font-ui); }
+.appearance-breeze .debt-summary strong { color: #134e4a; }
+.appearance-breeze .debt-add-btn { margin: 0 12px; border-radius: 999px; background: #0f766e; font-family: var(--font-ui); }
+.appearance-breeze .entry-form { display: grid; grid-template-columns: 1.1fr .9fr; gap: 12px 18px; padding: 24px 0; border-bottom: 1px solid #d6eeeb; }
+.appearance-breeze .amount-row, .appearance-breeze .note-daily-row { margin: 0; }
+.appearance-breeze .account-choice, .appearance-breeze .tag-choice { grid-column: 1 / -1; }
+.appearance-breeze .add-btn { grid-column: 2; }
+.appearance-breeze .amount-input, .appearance-breeze .note-input { border-color: #b8ddd7; background: #fff; font-family: var(--font-ui); }
+.appearance-breeze .amount-input:focus, .appearance-breeze .note-input:focus { border-color: #0f766e; box-shadow: 0 0 0 3px rgba(13, 148, 136, .1); }
+.appearance-breeze .entry-direction button, .appearance-breeze .choice-group button { font-family: var(--font-ui); }
+.appearance-breeze .entry-direction button.active, .appearance-breeze .choice-group button.active { border-color: #0f766e; background: #e6fffb; color: #0f766e; }
+.appearance-breeze .entry-direction button:first-child.active { border-color: #e11d48; background: #fff1f2; color: #be123c; }
+.appearance-breeze .add-btn, .appearance-breeze .save-balance-btn { border-color: #0f766e; border-radius: 999px; background: #0f766e; font-family: var(--font-ui); }
+.appearance-breeze .view-tabs { justify-content: center; margin-top: 22px; border: 0; }
+.appearance-breeze .view-tabs button { border-radius: 999px; color: #5f7f7c; font-family: var(--font-ui); }
+.appearance-breeze .view-tabs button.active { border-bottom-color: transparent; background: #ccfbf1; color: #0f766e; }
+.appearance-breeze .ledger { padding-top: 12px; }
+.appearance-breeze .daily-balance { padding: 14px; border: 1px solid #d6eeeb; border-radius: 14px; background: #f0fdfa; font-family: var(--font-ui); }
+.appearance-breeze .row { padding: 14px 7px; border-radius: 10px; }
+.appearance-breeze .row:hover, .appearance-breeze .day-summary-row:hover { background: #f0fdfa; }
+.appearance-breeze .row-note { font-family: var(--font-ui); font-weight: 600; }
+.appearance-breeze .account-badge, .appearance-breeze .tag-badge { border-color: #b8ddd7; background: #fff; color: #477673; font-family: var(--font-ui); }
+.appearance-breeze .pos { color: #047857; }
+.appearance-breeze .neg { color: #e11d48; }
+.appearance-breeze .chart-card { padding: 16px; border-radius: 16px; background: #f0fdfa; }
+
+@media (max-width: 640px) {
+  .appearance-breeze .sheet { padding: 24px 18px; }
+  .appearance-breeze .balance-stamps, .appearance-breeze .debt-card, .appearance-breeze .entry-form { grid-template-columns: 1fr; }
+  .appearance-breeze .debt-total-button + .debt-total-button { border-top: 1px solid #d6eeeb; border-left: 0; }
+  .appearance-breeze .debt-add-btn { margin: 10px 12px 12px; }
+  .appearance-breeze .add-btn { grid-column: 1; }
+}

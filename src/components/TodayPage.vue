@@ -14,6 +14,10 @@ defineEmits(['update:page', 'request-remove'])
     <div v-else class="day-group">
       <div class="day-label"><span>Giao dịch hôm nay</span><span class="rule"></span></div>
       <button v-for="row in paginatedRows" :key="row.id" type="button" class="row" :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${formatAmount(row.amount)}`" @click="$emit('request-remove', row)">
+        <span class="transaction-icon" :class="row.amount < 0 ? 'expense' : 'income'" aria-hidden="true">
+          <svg v-if="row.amount < 0" viewBox="0 0 24 24"><path d="M7 7h10v10M17 7 7 17" /></svg>
+          <svg v-else viewBox="0 0 24 24"><path d="M7 17h10V7M7 17 17 7" /></svg>
+        </span>
         <span class="row-note"><span>{{ row.note || '—' }}</span><span class="row-meta"><span class="account-badge">{{ accountLabel(row.account_type) }}</span><span v-if="row.tag" class="tag-badge">{{ row.tag }}</span><span v-if="row.entry_type === 'adjustment'" class="adjustment-badge">Điều chỉnh</span><span v-else-if="row.counts_toward_daily === false" class="daily-excluded-badge">Không tính ngày</span></span></span>
         <span class="row-time">{{ formatTime(row.created_at) }}</span><span class="row-amount" :class="[row.amount < 0 ? 'neg' : 'pos', { adjustment: row.entry_type === 'adjustment' }]">{{ row.amount < 0 ? '' : '+' }}{{ formatAmount(row.amount) }}</span>
       </button>
