@@ -950,6 +950,9 @@
   background: var(--red);
   color: var(--paper-card);
 }
+.transaction-icon {
+  display: none;
+}
 
 /* Giao diện dashboard hiện đại: thay đổi layout mà không thay đổi nghiệp vụ. */
 @media (max-width: 480px) {
@@ -1027,4 +1030,14 @@
   }
   .day-summary-row { grid-template-columns: 1fr auto; }
   .day-summary-values { grid-column: 1 / -1; grid-row: 2; display: flex; gap: 8px; text-align: left; }
+}
+
+@media (max-width: 430px) {
+  .page, .passbook, .sheet, .balance-controls, .balance-stamps, .balance-source-stamps, .debt-card, .entry-form, .ledger, .row, .amount-row, .note-daily-row {
+    min-width: 0;
+    max-width: 100%;
+  }
+  .balance-total-amount, .balance-source-amount, .debt-summary strong, .row-amount, .row-balance {
+    min-width: 0;
+  }
 }
