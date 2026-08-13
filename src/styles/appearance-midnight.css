@@ -65,7 +65,56 @@
 .appearance-midnight .expense-bar { background: #fb7185; }
 
 @media (max-width: 760px) {
-  .appearance-midnight .head, .appearance-midnight .balance-controls { display: grid; grid-template-columns: 1fr; }
-  .appearance-midnight .entry-form { grid-template-columns: 1fr; }
-  .appearance-midnight .entry-form > .add-btn { grid-column: 1; grid-row: auto; }
+  .appearance-midnight .page { padding: 0; background: transparent; }
+  .appearance-midnight .passbook { width: 100%; min-height: 100vh; border: 0; border-radius: 0; box-shadow: none; }
+  .appearance-midnight .spine { position: fixed; z-index: 5; top: 0; bottom: 0; left: 0; width: 4px; }
+  .appearance-midnight .sheet { padding: 18px 16px 32px 20px; }
+  .appearance-midnight .head { display: block; }
+  .appearance-midnight .head-text { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+  .appearance-midnight .head h1 { font-size: 28px; }
+  .appearance-midnight .balance-controls { display: flex; flex-direction: column; gap: 10px; }
+  .appearance-midnight .balance-stamps { width: calc(100% - 4px); min-width: 0; border-radius: 10px; }
+  .appearance-midnight .balance-total { padding: 14px; }
+  .appearance-midnight .balance-total-amount { font-size: 28px; }
+  .appearance-midnight .balance-source-stamps { display: grid; grid-template-columns: repeat(3, 1fr); padding: 5px; }
+  .appearance-midnight .balance-source { grid-template-columns: 1fr; justify-items: center; gap: 3px; min-height: 56px; text-align: center; }
+  .appearance-midnight .balance-source-icon { display: none; }
+  .appearance-midnight .balance-source-amount { min-width: 0; font-size: 10px; }
+  .appearance-midnight .debt-card { width: calc(100% - 4px); min-width: 0; display: grid; grid-template-columns: 1fr 1fr; margin-top: 0; border-radius: 10px; }
+  .appearance-midnight .debt-summary { padding: 10px; }
+  .appearance-midnight .debt-total-button + .debt-total-button { margin: 0; border-left: 1px solid #314967; }
+  .appearance-midnight .debt-add-btn { width: auto; min-width: 0; grid-column: 1 / -1; margin: 0 10px 10px; }
+  .appearance-midnight .entry-form { grid-template-columns: 1fr; margin-top: 18px; padding: 12px; border-radius: 10px; }
+  .appearance-midnight .amount-row, .appearance-midnight .note-daily-row, .appearance-midnight .choice-group, .appearance-midnight .entry-form > .add-btn { grid-column: 1; }
+  .appearance-midnight .entry-form > .add-btn { grid-row: auto; min-height: 46px; }
+  .appearance-midnight .view-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 18px; border: 1px solid #314967; border-radius: 8px; overflow: hidden; }
+  .appearance-midnight .view-tabs button { padding: 11px 8px; }
+  .appearance-midnight .view-tabs button.active { background: #213650; }
+  .appearance-midnight .ledger { margin-top: 14px; padding: 0; border: 0; }
+  .appearance-midnight .daily-balance { padding: 12px; border: 1px solid #213650; border-radius: 8px; background: #0f1c30; }
+  .appearance-midnight .row { grid-template-columns: minmax(0, 1fr) auto; padding: 13px 5px; }
+  .appearance-midnight .transaction-icon { display: none; }
+  .appearance-midnight .row-time { display: none; }
+  .appearance-midnight .row-amount { min-width: 84px; font-size: 13px; }
+}
+
+@media (max-width: 430px) {
+  .appearance-midnight .sheet { padding-right: 12px; padding-left: 16px; }
+  .appearance-midnight .head-text { min-width: 0; }
+  .appearance-midnight .head h1 { font-size: 26px; }
+  .appearance-midnight .eyebrow { max-width: 155px; font-size: 10px; letter-spacing: .1em; }
+  .appearance-midnight .settings-btn { flex-shrink: 0; padding: 5px 9px; }
+  .appearance-midnight .balance-total-amount { min-width: 0; font-size: clamp(23px, 8vw, 29px); overflow-wrap: anywhere; }
+  .appearance-midnight .balance-source-label { max-width: 100%; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .appearance-midnight .balance-source-amount { max-width: 100%; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .appearance-midnight .debt-summary { min-width: 0; padding: 10px 8px; }
+  .appearance-midnight .debt-summary span { overflow-wrap: anywhere; }
+  .appearance-midnight .debt-summary strong { min-width: 0; font-size: 14px; }
+  .appearance-midnight .debt-add-btn { margin-right: 8px; margin-left: 8px; }
+  .appearance-midnight .amount-row .amount-input, .appearance-midnight .note-daily-row .note-input { min-width: 0; }
+  .appearance-midnight .entry-direction button { padding-right: 7px; padding-left: 7px; }
+  .appearance-midnight .daily-toggle { min-width: 0; }
+  .appearance-midnight .daily-toggle-text { font-size: 10px; }
+  .appearance-midnight .row-note { min-width: 0; }
+  .appearance-midnight .row-amount { min-width: 74px; font-size: 12px; }
 }
