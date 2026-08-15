@@ -51,7 +51,8 @@ Mở trang deploy trên Chrome/Safari mobile → menu → "Add to Home Screen". 
 ## Điều chỉnh số dư và theo dõi nợ
 
 - `entries.entry_type` là `transaction` cho giao dịch thu/chi bình thường hoặc `adjustment` cho điều chỉnh số dư thủ công. Adjustment vẫn cập nhật số dư tài khoản và tổng số dư, nhưng không tham gia số dư ngày hoặc số dư chạy trên từng dòng.
-- Bảng `debts` lưu riêng các khoản nợ: `debt_type` là `owed` (bạn đang nợ) hoặc `lent` (người khác đang nợ bạn); `amount` dương là phát sinh, âm là trả/thu hồi. Hai tổng được hiển thị và xem chi tiết riêng.
+- Hệ thống nợ dùng ba bảng: `debt_accounts` (mỗi khoản nợ), `debt_entries` (dư đầu kỳ, phát sinh và thanh toán), và `debt_month_plans` (lịch trả theo tháng). **Tổng nợ** là tổng luỹ kế từng khoản; **Cần trả tháng này** là kế hoạch tháng trừ số đã trả trong tháng. Khi thanh toán, database ghi đồng thời một giao dịch chi tiền và một dòng trả nợ nên số dư tiền/tổng nợ luôn khớp. Khi có phát sinh mới, người dùng có thể phân bổ số tiền đó vào các tháng mong muốn.
+- Sau khi cập nhật mã, chạy lại toàn bộ `supabase_schema.sql` trong Supabase SQL Editor trước khi dùng tính năng khoản nợ mới. Dữ liệu ở bảng `debts` cũ không được tự chuyển đổi vì không có tên khoản nợ để gán chính xác; hãy tạo lại các khoản đang còn nợ trong màn hình **Quản lý khoản nợ**.
 - Với database đã có dữ liệu cũ, chạy migration sau trong SQL Editor (file `supabase_schema.sql` cũng đã có đầy đủ):
 
 ```sql

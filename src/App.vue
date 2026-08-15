@@ -7,11 +7,14 @@ import TodayPage from './components/TodayPage.vue'
 import HistoryPage from './components/HistoryPage.vue'
 import AppDialogs from './components/AppDialogs.vue'
 import SettingsModal from './components/SettingsModal.vue'
-import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebts, addDebt, deleteDebt, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
+import DebtManager from './components/DebtManager.vue'
+import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
 const tags = ref([])
-const debts = ref([])
+const debtAccounts = ref([])
+const debtEntries = ref([])
+const debtPlans = ref([])
 const session = ref(null)
 const authLoading = ref(true)
 const localAuthError = ref('')
@@ -28,10 +31,6 @@ const countsTowardDaily = ref(true)
 const balancesHidden = ref(false)
 const dailyInfoOpen = ref(false)
 const dailyInfoRef = ref(null)
-const debtInput = ref('')
-const debtNote = ref('')
-const debtDirection = ref(1)
-const debtType = ref('owed')
 const editingBalance = ref(false)
 const balanceInput = ref('')
 const savingBalance = ref(false)
@@ -50,9 +49,7 @@ const detailTitle = ref('')
 const detailPage = ref(1)
 const selectedEntryDetail = ref(null)
 const confirmingEntry = ref(null)
-const confirmingDebt = ref(null)
-const debtDetailType = ref(null)
-const debtModalOpen = ref(false)
+const debtManagerOpen = ref(false)
 const settingsOpen = ref(false)
 const appearance = ref('ledger')
 const pageSize = 10
@@ -104,7 +101,9 @@ onMounted(async () => {
     } else if (!nextSession) {
       entries.value = []
       tags.value = []
-      debts.value = []
+      debtAccounts.value = []
+      debtEntries.value = []
+      debtPlans.value = []
       loading.value = false
       error.value = ''
     }
@@ -128,10 +127,12 @@ async function getLocalSession() {
 async function load() {
   loading.value = true
   try {
-    const [loadedEntries, loadedTags, loadedDebts] = await Promise.all([fetchEntries(), fetchTags(), fetchDebts()])
+    const [loadedEntries, loadedTags, loadedDebtData] = await Promise.all([fetchEntries(), fetchTags(), fetchDebtData()])
     entries.value = loadedEntries
     tags.value = loadedTags
-    debts.value = loadedDebts
+    debtAccounts.value = loadedDebtData.accounts
+    debtEntries.value = loadedDebtData.entries
+    debtPlans.value = loadedDebtData.plans
     await seedDefaultTags()
   } catch (e) {
     error.value = 'Không tải được sổ. Kiểm tra kết nối Supabase.'
@@ -308,14 +309,17 @@ const dailyIncome = computed(() => todayRows.value
 const dailyExpense = computed(() => todayRows.value
   .filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0)
   .reduce((total, row) => total + Math.abs(Number(row.amount)), 0))
-const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
-const lentDebts = computed(() => debts.value.filter((debt) => debt.debt_type === 'lent'))
-const currentMonthDebt = computed(() => owedDebts.value
-  .filter((debt) => isInCurrentMonth(debt.created_at))
-  .reduce((total, debt) => total + Number(debt.amount), 0))
-const currentDebt = computed(() => owedDebts.value.reduce((total, debt) => total + Number(debt.amount), 0))
-const currentLent = computed(() => lentDebts.value.reduce((total, debt) => total + Number(debt.amount), 0))
-const visibleDebtDetails = computed(() => debtDetailType.value === 'lent' ? lentDebts.value : owedDebts.value)
+const currentDebtMonth = computed(() => `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, '0')}-01`)
+const debts = computed(() => debtAccounts.value.map((account) => {
+  const entries = debtEntries.value.filter((entry) => entry.debt_id === account.id)
+  const plans = debtPlans.value.filter((plan) => plan.debt_id === account.id)
+  const balance = entries.reduce((total, entry) => total + Number(entry.amount), 0)
+  const monthPlanned = plans.filter((plan) => plan.month === currentDebtMonth.value).reduce((total, plan) => total + Number(plan.planned_amount), 0)
+  const monthPaid = entries.filter((entry) => entry.entry_type === 'payment' && String(entry.occurred_at).slice(0, 7) === currentDebtMonth.value.slice(0, 7)).reduce((total, entry) => total + Math.abs(Number(entry.amount)), 0)
+  return { ...account, entries, plans: plans.map((plan) => ({ month: plan.month, amount: Number(plan.planned_amount) })), balance, monthPlanned, monthPaid, monthRemaining: Math.max(0, monthPlanned - monthPaid) }
+}).filter((debt) => debt.balance > 0))
+const currentDebt = computed(() => debts.value.reduce((total, debt) => total + debt.balance, 0))
+const currentMonthDebt = computed(() => debts.value.reduce((total, debt) => total + debt.monthRemaining, 0))
 const todayTotalPages = computed(() => Math.max(1, Math.ceil(todayRows.value.length / pageSize)))
 const paginatedTodayRows = computed(() => {
   const start = (todayPage.value - 1) * pageSize
@@ -609,75 +613,43 @@ function requestRemove(entry) {
   confirmingEntry.value = entry
 }
 
-async function submitDebt() {
-  const raw = debtInput.value.trim()
-  const amount = Math.abs(Number(raw.replace(/[, ]/g, '')))
-  if (!raw || Number.isNaN(amount) || amount === 0) {
-    error.value = 'Nhập số nợ khác 0'
-    return
-  }
+function openDebtManager() {
+  error.value = ''
+  debtManagerOpen.value = true
+}
+
+function closeDebtManager() {
+  debtManagerOpen.value = false
+}
+
+async function createDebt(payload) {
   error.value = ''
   try {
-    const created = await addDebt(amount * debtDirection.value, debtNote.value.trim() || null, debtType.value)
-    debts.value = [created, ...debts.value]
-    debtInput.value = ''
-    debtNote.value = ''
-    debtDirection.value = 1
-    debtType.value = 'owed'
-    debtModalOpen.value = false
+    await createDebtAccount(payload.name, payload.note, payload.amount, payload.plans)
+    await load()
+    closeDebtManager()
   } catch (e) {
-    error.value = 'Không lưu được khoản nợ. Thử lại.'
+    error.value = 'Không thể tạo khoản nợ. Vui lòng thử lại.'
   }
 }
 
-function openDebtModal() {
+async function increaseDebt(payload) {
   error.value = ''
-  debtModalOpen.value = true
-}
-
-function closeDebtModal() {
-  debtModalOpen.value = false
-}
-
-function requestRemoveDebt(debt) {
-  debtDetailType.value = null
-  confirmingDebt.value = debt
-}
-
-function cancelRemoveDebt() {
-  confirmingDebt.value = null
-}
-
-function closeDebtDetails() {
-  debtDetailType.value = null
-}
-
-async function confirmRemoveDebt() {
-  const debt = confirmingDebt.value
-  if (!debt) return
-  confirmingDebt.value = null
-  const isLent = debt.debt_type === 'lent'
-  const settlementAmount = Math.abs(Number(debt.amount)) * (isLent ? 1 : -1)
-  const settlementNote = isLent
-    ? `Thu hồi khoản cho nợ${debt.note ? `: ${debt.note}` : ''}`
-    : `Thanh toán nợ${debt.note ? `: ${debt.note}` : ''}`
-  let settlementEntry = null
   try {
-    settlementEntry = await addEntry(settlementAmount, settlementNote, 'bank', null, 'transaction', false)
-    await deleteDebt(debt.id)
-    entries.value = [settlementEntry, ...entries.value]
-    debts.value = debts.value.filter((item) => item.id !== debt.id)
-    currentPage.value = 1
-    todayPage.value = 1
+    await addDebtIncrease(payload.debtId, payload.amount, payload.note, payload.plans)
+    await load()
   } catch (e) {
-    if (settlementEntry) {
-      try {
-        await deleteEntry(settlementEntry.id)
-      } catch (rollbackError) {
-        await load()
-      }
-    }
-    error.value = 'Không thể tất toán khoản nợ. Số dư và khoản nợ được giữ nguyên.'
+    error.value = 'Không thể ghi phát sinh nợ. Vui lòng thử lại.'
+  }
+}
+
+async function submitDebtPayment(payload) {
+  error.value = ''
+  try {
+    await payDebt(payload.debtId, payload.amount, payload.accountType, payload.note)
+    await load()
+  } catch (e) {
+    error.value = 'Không thể thanh toán nợ. Kiểm tra số dư nợ rồi thử lại.'
   }
 }
 
@@ -818,14 +790,13 @@ const detailVisibleRange = computed(() => {
           :current-balance="currentBalance"
           :balances-by-account="balancesByAccount"
           :balance-account-types="balanceAccountTypes"
-          :current-lent="currentLent"
+          :current-month-debt="currentMonthDebt"
           :current-debt="currentDebt"
           :format-amount="fmt"
           @open-settings="settingsOpen = true"
           @toggle-balances="toggleBalances"
           @start-balance-edit="startBalanceEdit"
-          @open-debt-details="debtDetailType = $event"
-          @open-debt-modal="openDebtModal"
+          @open-debt-manager="openDebtManager"
         />
         <EntryForm
           v-model:input="input"
@@ -916,18 +887,10 @@ const detailVisibleRange = computed(() => {
     </div>
 
     <AppDialogs
-      v-model:debt-input="debtInput"
-      v-model:debt-note="debtNote"
-      v-model:debt-direction="debtDirection"
-      v-model:debt-type="debtType"
       v-model:tag-input="tagInput"
       v-model:editing-tag-name="editingTagName"
       v-model:detail-page="detailPage"
       :confirming-entry="confirmingEntry"
-      :confirming-debt="confirmingDebt"
-      :debt-detail-type="debtDetailType"
-      :visible-debt-details="visibleDebtDetails"
-      :debt-modal-open="debtModalOpen"
       :tag-modal-open="tagModalOpen"
       :tags="tags"
       :editing-tag-id="editingTagId"
@@ -945,12 +908,6 @@ const detailVisibleRange = computed(() => {
       :account-label="accountLabel"
       @cancel-remove="cancelRemove"
       @confirm-remove="confirmRemove"
-      @cancel-remove-debt="cancelRemoveDebt"
-      @confirm-remove-debt="confirmRemoveDebt"
-      @close-debt-details="closeDebtDetails"
-      @request-remove-debt="requestRemoveDebt"
-      @close-debt-modal="closeDebtModal"
-      @submit-debt="submitDebt"
       @close-tag-modal="closeTagModal"
       @submit-tag="submitTag"
       @start-tag-edit="startTagEdit"
@@ -960,6 +917,17 @@ const detailVisibleRange = computed(() => {
       @close-details="closeDetails"
       @open-entry-detail="openEntryDetail"
       @close-entry-detail="closeEntryDetail"
+    />
+    <DebtManager
+      :open="debtManagerOpen"
+      :debts="debts"
+      :balances-hidden="balancesHidden"
+      :format-amount="fmt"
+      :error="error"
+      @close="closeDebtManager"
+      @create="createDebt"
+      @increase="increaseDebt"
+      @pay="submitDebtPayment"
     />
     <SettingsModal
       :open="settingsOpen"
