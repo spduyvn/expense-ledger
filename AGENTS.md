@@ -82,6 +82,15 @@ RLS hiện cho phép anon đọc/ghi toàn bộ, phù hợp ứng dụng cá nh�
 - Giữ phong cách sổ tay hiện tại: nền giấy, màu mực, màu đồng; tránh thêm UI library nếu không được yêu cầu.
 - Khi thay đổi cách tải dữ liệu, cần cân nhắc ảnh hưởng đến số dư luỹ kế và phân trang.
 
+## Quy ước commit
+
+- Dùng chuẩn Conventional Commits: `<type>[optional scope]: <description>`.
+- `type` được dùng: `fix`, `feat` (hoặc `feature`), `refactor`, `docs`, `style`, `perf`, `vendor`, `chore`, `revert`, `build`, `ci`, `wip`.
+- `scope` là tuỳ chọn, là danh từ mô tả phạm vi bị ảnh hưởng, ví dụ: `debt`, `ui`, `auth`, `supabase`.
+- Viết `description` ngắn gọn ở thể mệnh lệnh, bắt đầu bằng động từ, viết thường (trừ danh từ riêng) và không kết thúc bằng dấu chấm.
+- Với thay đổi không tương thích ngược, thêm `!` ngay sau `type` hoặc `type(scope)`, ví dụ: `refactor!: drop support for Node 6`.
+- Không dùng commit message chung chung như `fix bug`, `save code`, `update code` hoặc `create file`.
+
 ## Kiểm tra trước khi hoàn tất
 
 1. Xem lại diff, bảo đảm chỉ có thay đổi phục vụ yêu cầu.
