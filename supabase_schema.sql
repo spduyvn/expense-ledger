@@ -153,3 +153,152 @@ create policy "Users can update their own debts" on debts
   for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 create policy "Users can delete their own debts" on debts
   for delete using (user_id = auth.uid());
+
+-- Sổ nợ theo khoản: một khoản nợ có thể phát sinh và được trả dần qua nhiều tháng.
+create table if not exists debt_accounts (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (length(trim(name)) > 0),
+  note text,
+  user_id uuid not null default auth.uid() references auth.users(id),
+  created_at timestamptz not null default now(),
+  closed_at timestamptz
+);
+
+create table if not exists debt_entries (
+  id uuid primary key default gen_random_uuid(),
+  debt_id uuid not null references debt_accounts(id) on delete cascade,
+  amount numeric not null check (amount <> 0),
+  entry_type text not null check (entry_type in ('opening', 'increase', 'payment', 'adjustment')),
+  note text,
+  occurred_at timestamptz not null default now(),
+  ledger_entry_id uuid references entries(id),
+  user_id uuid not null default auth.uid() references auth.users(id),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists debt_month_plans (
+  id uuid primary key default gen_random_uuid(),
+  debt_id uuid not null references debt_accounts(id) on delete cascade,
+  month date not null check (month = date_trunc('month', month)::date),
+  planned_amount numeric not null check (planned_amount > 0),
+  user_id uuid not null default auth.uid() references auth.users(id),
+  created_at timestamptz not null default now(),
+  unique (debt_id, month)
+);
+
+alter table debt_accounts enable row level security;
+alter table debt_entries enable row level security;
+alter table debt_month_plans enable row level security;
+
+drop policy if exists "Users can manage their own debt accounts" on debt_accounts;
+drop policy if exists "Users can manage their own debt entries" on debt_entries;
+drop policy if exists "Users can manage their own debt plans" on debt_month_plans;
+
+create policy "Users can manage their own debt accounts" on debt_accounts
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "Users can manage their own debt entries" on debt_entries
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+create policy "Users can manage their own debt plans" on debt_month_plans
+  for all using (user_id = auth.uid()) with check (user_id = auth.uid());
+
+create index if not exists debt_entries_user_debt_occurred_at_idx
+  on debt_entries (user_id, debt_id, occurred_at desc);
+create index if not exists debt_month_plans_user_debt_month_idx
+  on debt_month_plans (user_id, debt_id, month);
+
+create or replace function create_debt_account(
+  p_name text,
+  p_note text,
+  p_opening_amount numeric,
+  p_plans jsonb default '[]'::jsonb
+) returns uuid
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_debt_id uuid;
+  v_plan jsonb;
+begin
+  if auth.uid() is null or coalesce(trim(p_name), '') = '' or p_opening_amount <= 0 then
+    raise exception 'Thông tin khoản nợ không hợp lệ';
+  end if;
+
+  insert into debt_accounts (name, note) values (trim(p_name), p_note) returning id into v_debt_id;
+  insert into debt_entries (debt_id, amount, entry_type, note)
+  values (v_debt_id, p_opening_amount, 'opening', coalesce(p_note, 'Dư nợ ban đầu'));
+
+  for v_plan in select value from jsonb_array_elements(coalesce(p_plans, '[]'::jsonb)) loop
+    insert into debt_month_plans (debt_id, month, planned_amount)
+    values (v_debt_id, (v_plan->>'month')::date, (v_plan->>'amount')::numeric)
+    on conflict (debt_id, month) do update
+      set planned_amount = debt_month_plans.planned_amount + excluded.planned_amount;
+  end loop;
+  return v_debt_id;
+end;
+$$;
+
+create or replace function add_debt_increase(
+  p_debt_id uuid,
+  p_amount numeric,
+  p_note text,
+  p_plans jsonb default '[]'::jsonb
+) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_plan jsonb;
+begin
+  if p_amount <= 0 or not exists (select 1 from debt_accounts where id = p_debt_id and user_id = auth.uid()) then
+    raise exception 'Khoản nợ hoặc số tiền không hợp lệ';
+  end if;
+  insert into debt_entries (debt_id, amount, entry_type, note)
+  values (p_debt_id, p_amount, 'increase', p_note);
+  for v_plan in select value from jsonb_array_elements(coalesce(p_plans, '[]'::jsonb)) loop
+    insert into debt_month_plans (debt_id, month, planned_amount)
+    values (p_debt_id, (v_plan->>'month')::date, (v_plan->>'amount')::numeric)
+    on conflict (debt_id, month) do update
+      set planned_amount = debt_month_plans.planned_amount + excluded.planned_amount;
+  end loop;
+end;
+$$;
+
+create or replace function pay_debt(
+  p_debt_id uuid,
+  p_amount numeric,
+  p_account_type text,
+  p_note text default null
+) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+declare
+  v_balance numeric;
+  v_ledger_entry_id uuid;
+  v_name text;
+begin
+  select coalesce(sum(amount), 0), max(debt_accounts.name)
+  into v_balance, v_name
+  from debt_entries
+  join debt_accounts on debt_accounts.id = debt_entries.debt_id
+  where debt_entries.debt_id = p_debt_id and debt_entries.user_id = auth.uid()
+  group by debt_entries.debt_id;
+
+  if p_amount <= 0 or v_balance is null or p_amount > v_balance then
+    raise exception 'Số tiền trả không hợp lệ';
+  end if;
+  if p_account_type not in ('cash', 'bank', 'wallet') then
+    raise exception 'Nguồn tiền không hợp lệ';
+  end if;
+
+  insert into entries (amount, note, account_type, entry_type, counts_toward_daily)
+  values (-p_amount, coalesce(p_note, 'Trả nợ: ' || v_name), p_account_type, 'transaction', false)
+  returning id into v_ledger_entry_id;
+
+  insert into debt_entries (debt_id, amount, entry_type, note, ledger_entry_id)
+  values (p_debt_id, -p_amount, 'payment', coalesce(p_note, 'Thanh toán: ' || v_name), v_ledger_entry_id);
+end;
+$$;

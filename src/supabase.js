@@ -100,26 +100,45 @@ export async function deleteTag(id) {
   if (error) throw error
 }
 
-export async function fetchDebts() {
-  const { data, error } = await supabase
-    .from('debts')
-    .select('*')
-    .order('created_at', { ascending: false })
+export async function fetchDebtData() {
+  const [accountsResult, entriesResult, plansResult] = await Promise.all([
+    supabase.from('debt_accounts').select('*').order('created_at', { ascending: false }),
+    supabase.from('debt_entries').select('*').order('occurred_at', { ascending: false }),
+    supabase.from('debt_month_plans').select('*').order('month', { ascending: true })
+  ])
+  const error = accountsResult.error || entriesResult.error || plansResult.error
   if (error) throw error
-  return data
+  return { accounts: accountsResult.data, entries: entriesResult.data, plans: plansResult.data }
 }
 
-export async function addDebt(amount, note, debtType = 'owed') {
-  const { data, error } = await supabase
-    .from('debts')
-    .insert({ amount, note, debt_type: debtType })
-    .select()
-    .single()
+async function callDebtRpc(name, args) {
+  const { error } = await supabase.rpc(name, args)
   if (error) throw error
-  return data
 }
 
-export async function deleteDebt(id) {
-  const { error } = await supabase.from('debts').delete().eq('id', id)
-  if (error) throw error
+export function createDebtAccount(name, note, openingAmount, plans) {
+  return callDebtRpc('create_debt_account', {
+    p_name: name,
+    p_note: note,
+    p_opening_amount: openingAmount,
+    p_plans: plans
+  })
+}
+
+export function addDebtIncrease(debtId, amount, note, plans) {
+  return callDebtRpc('add_debt_increase', {
+    p_debt_id: debtId,
+    p_amount: amount,
+    p_note: note,
+    p_plans: plans
+  })
+}
+
+export function payDebt(debtId, amount, accountType, note) {
+  return callDebtRpc('pay_debt', {
+    p_debt_id: debtId,
+    p_amount: amount,
+    p_account_type: accountType,
+    p_note: note
+  })
 }
