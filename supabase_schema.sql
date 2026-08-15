@@ -302,3 +302,70 @@ begin
   values (p_debt_id, -p_amount, 'payment', coalesce(p_note, 'Thanh toán: ' || v_name), v_ledger_entry_id);
 end;
 $$;
+
+create or replace function update_debt_account(
+  p_debt_id uuid,
+  p_name text,
+  p_note text
+) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if coalesce(trim(p_name), '') = '' then
+    raise exception 'Tên khoản nợ không hợp lệ';
+  end if;
+  update debt_accounts set name = trim(p_name), note = p_note
+  where id = p_debt_id and user_id = auth.uid();
+  if not found then raise exception 'Không tìm thấy khoản nợ'; end if;
+end;
+$$;
+
+create or replace function delete_debt_account(p_debt_id uuid)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if exists (select 1 from debt_entries where debt_id = p_debt_id and ledger_entry_id is not null and user_id = auth.uid()) then
+    raise exception 'Không thể xoá khoản nợ đã có thanh toán';
+  end if;
+  delete from debt_accounts where id = p_debt_id and user_id = auth.uid();
+  if not found then raise exception 'Không tìm thấy khoản nợ'; end if;
+end;
+$$;
+
+create or replace function save_debt_plan(
+  p_debt_id uuid,
+  p_month date,
+  p_amount numeric
+) returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  if p_amount <= 0 or p_month <> date_trunc('month', p_month)::date
+    or not exists (select 1 from debt_accounts where id = p_debt_id and user_id = auth.uid()) then
+    raise exception 'Lịch trả không hợp lệ';
+  end if;
+  insert into debt_month_plans (debt_id, month, planned_amount)
+  values (p_debt_id, p_month, p_amount)
+  on conflict (debt_id, month) do update set planned_amount = excluded.planned_amount;
+end;
+$$;
+
+create or replace function delete_debt_plan(p_debt_id uuid, p_month date)
+returns void
+language plpgsql
+security invoker
+set search_path = public
+as $$
+begin
+  delete from debt_month_plans
+  where debt_id = p_debt_id and month = p_month and user_id = auth.uid();
+  if not found then raise exception 'Không tìm thấy lịch trả'; end if;
+end;
+$$;
