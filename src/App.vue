@@ -8,7 +8,7 @@ import HistoryPage from './components/HistoryPage.vue'
 import AppDialogs from './components/AppDialogs.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import DebtManager from './components/DebtManager.vue'
-import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
+import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, updateDebtAccount, deleteDebtAccount, saveDebtPlan, deleteDebtPlan, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
 const tags = ref([])
@@ -653,6 +653,46 @@ async function submitDebtPayment(payload) {
   }
 }
 
+async function editDebt(payload) {
+  error.value = ''
+  try {
+    await updateDebtAccount(payload.debtId, payload.name, payload.note)
+    await load()
+  } catch (e) {
+    error.value = 'Không thể cập nhật khoản nợ. Vui lòng thử lại.'
+  }
+}
+
+async function removeDebt(payload) {
+  error.value = ''
+  try {
+    await deleteDebtAccount(payload.debtId)
+    await load()
+  } catch (e) {
+    error.value = 'Không thể xoá khoản nợ. Vui lòng thử lại.'
+  }
+}
+
+async function updateDebtPlan(payload) {
+  error.value = ''
+  try {
+    await saveDebtPlan(payload.debtId, payload.month, payload.amount)
+    await load()
+  } catch (e) {
+    error.value = 'Không thể lưu lịch trả. Vui lòng thử lại.'
+  }
+}
+
+async function removeDebtPlan(payload) {
+  error.value = ''
+  try {
+    await deleteDebtPlan(payload.debtId, payload.month)
+    await load()
+  } catch (e) {
+    error.value = 'Không thể xoá lịch trả. Vui lòng thử lại.'
+  }
+}
+
 function cancelRemove() {
   confirmingEntry.value = null
 }
@@ -928,6 +968,10 @@ const detailVisibleRange = computed(() => {
       @create="createDebt"
       @increase="increaseDebt"
       @pay="submitDebtPayment"
+      @edit="editDebt"
+      @delete="removeDebt"
+      @save-plan="updateDebtPlan"
+      @delete-plan="removeDebtPlan"
     />
     <SettingsModal
       :open="settingsOpen"

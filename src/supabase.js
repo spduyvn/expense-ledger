@@ -142,3 +142,19 @@ export function payDebt(debtId, amount, accountType, note) {
     p_note: note
   })
 }
+
+export function updateDebtAccount(debtId, name, note) {
+  return callDebtRpc('update_debt_account', { p_debt_id: debtId, p_name: name, p_note: note })
+}
+
+export function deleteDebtAccount(debtId) {
+  return callDebtRpc('delete_debt_account', { p_debt_id: debtId })
+}
+
+export function saveDebtPlan(debtId, month, amount) {
+  return callDebtRpc('save_debt_plan', { p_debt_id: debtId, p_month: month, p_amount: amount })
+}
+
+export function deleteDebtPlan(debtId, month) {
+  return callDebtRpc('delete_debt_plan', { p_debt_id: debtId, p_month: month })
+}
