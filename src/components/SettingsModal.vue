@@ -2,10 +2,11 @@
 defineProps({
   open: { type: Boolean, required: true },
   isLocalEnvironment: { type: Boolean, required: true },
-  appearance: { type: String, required: true }
+  appearance: { type: String, required: true },
+  dayResetTimeZone: { type: String, required: true }
 })
 
-defineEmits(['close', 'update:appearance', 'open-tag-manager', 'sign-out'])
+defineEmits(['close', 'update:appearance', 'update:day-reset-time-zone', 'open-tag-manager', 'sign-out'])
 </script>
 
 <template>
@@ -40,6 +41,23 @@ defineEmits(['close', 'update:appearance', 'open-tag-manager', 'sign-out'])
             <span><strong>Thoáng</strong><small>Tông xanh dịu, giao diện sáng và tối giản.</small></span>
           </button>
         </div>
+      </section>
+
+      <section class="settings-section" aria-labelledby="day-reset-title">
+        <h3 id="day-reset-title">Ngày ghi sổ</h3>
+        <p>Múi giờ này xác định thời điểm reset tổng thu chi ngày, màn hình Hôm nay và các bộ lọc ngày.</p>
+        <label class="time-zone-field" for="day-reset-time-zone">
+          Múi giờ reset ngày
+          <select id="day-reset-time-zone" :value="dayResetTimeZone" @change="$emit('update:day-reset-time-zone', $event.target.value)">
+            <option value="Asia/Ho_Chi_Minh">Việt Nam (GMT+7)</option>
+            <option value="Asia/Bangkok">Bangkok (GMT+7)</option>
+            <option value="Asia/Singapore">Singapore (GMT+8)</option>
+            <option value="Asia/Tokyo">Tokyo (GMT+9)</option>
+            <option value="America/Los_Angeles">Los Angeles</option>
+            <option value="America/New_York">New York</option>
+            <option value="Europe/London">London</option>
+          </select>
+        </label>
       </section>
 
       <section class="settings-section" aria-labelledby="tags-settings-title">
