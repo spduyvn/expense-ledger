@@ -8,6 +8,8 @@ import HistoryPage from './components/HistoryPage.vue'
 import AppDialogs from './components/AppDialogs.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import DebtManager from './components/DebtManager.vue'
+import { addDays, dateKey, isSameDay, browserTimeZone, monthKey, weekStartKey } from './utils/date'
+import { formatMoney, parseMoney, parseSignedMoney } from './utils/money'
 import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, updateDebtAccount, deleteDebtAccount, saveDebtPlan, deleteDebtPlan, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
@@ -52,6 +54,7 @@ const confirmingEntry = ref(null)
 const debtManagerOpen = ref(false)
 const settingsOpen = ref(false)
 const appearance = ref('ledger')
+const dayResetTimeZone = ref(browserTimeZone())
 const pageSize = 10
 const accountTypes = [
   { value: 'cash', label: 'Tiền mặt' },
@@ -76,6 +79,8 @@ onMounted(async () => {
     balancesHidden.value = localStorage.getItem('dmoney-balances-hidden') === 'true'
     const savedAppearance = localStorage.getItem('dmoney-appearance')
     if (['ledger', 'modern', 'midnight', 'breeze'].includes(savedAppearance)) appearance.value = savedAppearance
+    const savedDayResetTimeZone = localStorage.getItem('dmoney-day-reset-time-zone')
+    if (savedDayResetTimeZone) dayResetTimeZone.value = savedDayResetTimeZone
   } catch (e) {
     // Giữ trạng thái mặc định nếu trình duyệt chặn localStorage.
   }
@@ -188,53 +193,41 @@ const balancesByAccount = computed(() => entries.value.reduce((balances, entry) 
   balances[accountType] += Number(entry.amount)
   return balances
 }, { cash: 0, bank: 0, wallet: 0 }))
-const currentDate = new Intl.DateTimeFormat('vi-VN', {
+const currentDate = computed(() => new Intl.DateTimeFormat('vi-VN', {
   weekday: 'long',
   day: '2-digit',
   month: '2-digit',
   year: 'numeric',
-  timeZone: 'UTC'
-}).format(new Date())
+  timeZone: dayResetTimeZone.value
+}).format(new Date()))
 
 function utcDateKey(value) {
-  const date = new Date(value)
-  const year = date.getUTCFullYear()
-  const month = String(date.getUTCMonth() + 1).padStart(2, '0')
-  const day = String(date.getUTCDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return dateKey(value, dayResetTimeZone.value)
 }
 
 function isSameUtcDay(value, date) {
-  return utcDateKey(value) === utcDateKey(date)
+  return isSameDay(value, date, dayResetTimeZone.value)
 }
 
 function startOfUtcDay(date = new Date()) {
-  const result = new Date(date)
-  result.setUTCHours(0, 0, 0, 0)
-  return result
+  return utcDateKey(date)
 }
 
 function isInHistoryPeriod(value) {
-  const date = new Date(value)
-  const now = new Date()
-  const today = startOfUtcDay(now)
+  const rowKey = utcDateKey(value)
+  const today = utcDateKey()
 
   if (historyPeriod.value === 'day') return true
 
   if (historyPeriod.value === 'week') {
-    const weekStart = new Date(today)
-    const weekday = weekStart.getUTCDay() || 7
-    weekStart.setUTCDate(weekStart.getUTCDate() - weekday + 1)
-    return date >= weekStart && date <= now
+    return rowKey >= weekStartKey(new Date(), dayResetTimeZone.value) && rowKey <= today
   }
 
-  return date.getUTCFullYear() === now.getUTCFullYear() && date.getUTCMonth() === now.getUTCMonth()
+  return rowKey.slice(0, 7) === monthKey(new Date(), dayResetTimeZone.value)
 }
 
 function isInCurrentMonth(value) {
-  const date = new Date(value)
-  const now = new Date()
-  return date.getUTCFullYear() === now.getUTCFullYear() && date.getUTCMonth() === now.getUTCMonth()
+  return utcDateKey(value).slice(0, 7) === monthKey(new Date(), dayResetTimeZone.value)
 }
 
 function fmtTime(value) {
@@ -309,7 +302,7 @@ const dailyIncome = computed(() => todayRows.value
 const dailyExpense = computed(() => todayRows.value
   .filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0)
   .reduce((total, row) => total + Math.abs(Number(row.amount)), 0))
-const currentDebtMonth = computed(() => `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, '0')}-01`)
+const currentDebtMonth = computed(() => `${monthKey(new Date(), dayResetTimeZone.value)}-01`)
 const debts = computed(() => debtAccounts.value.map((account) => {
   const entries = debtEntries.value.filter((entry) => entry.debt_id === account.id)
   const plans = debtPlans.value.filter((plan) => plan.debt_id === account.id)
@@ -359,27 +352,28 @@ const dailySummaries = computed(() => {
 
 const chartBuckets = computed(() => {
   const now = new Date()
-  const start = startOfUtcDay(now)
+  let start = utcDateKey(now)
   const buckets = []
-  let count = historyPeriod.value === 'week' ? 7 : new Date(now.getUTCFullYear(), now.getUTCMonth() + 1, 0).getUTCDate()
+  let count = historyPeriod.value === 'week' ? 7 : Number(`${monthKey(now, dayResetTimeZone.value)}-01`.slice(8, 10))
+  if (historyPeriod.value !== 'week') {
+    const [year, month] = monthKey(now, dayResetTimeZone.value).split('-').map(Number)
+    count = new Date(Date.UTC(year, month, 0)).getUTCDate()
+  }
   if (hasDateSearch.value) {
     const firstKey = dateFrom.value || utcDateKey(historyRows.value.at(-1)?.created_at || now)
     const lastKey = dateTo.value || utcDateKey(historyRows.value[0]?.created_at || now)
     const [startYear, startMonth, startDay] = firstKey.split('-').map(Number)
     const [endYear, endMonth, endDay] = lastKey.split('-').map(Number)
-    start.setTime(Date.UTC(startYear, startMonth - 1, startDay))
-    const end = new Date(Date.UTC(endYear, endMonth - 1, endDay))
-    count = Math.max(1, Math.round((end - start) / 86400000) + 1)
+    start = `${startYear}-${String(startMonth).padStart(2, '0')}-${String(startDay).padStart(2, '0')}`
+    const end = `${endYear}-${String(endMonth).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`
+    count = Math.max(1, Math.round((new Date(`${end}T00:00:00Z`) - new Date(`${start}T00:00:00Z`)) / 86400000) + 1)
   } else if (historyPeriod.value === 'week') {
-    const weekday = start.getUTCDay() || 7
-    start.setUTCDate(start.getUTCDate() - weekday + 1)
+    start = weekStartKey(now, dayResetTimeZone.value)
   } else {
-    start.setUTCDate(1)
+    start = `${monthKey(now, dayResetTimeZone.value)}-01`
   }
   for (let index = 0; index < count; index += 1) {
-    const date = new Date(start)
-    date.setUTCDate(start.getUTCDate() + index)
-    const key = utcDateKey(date)
+    const key = addDays(start, index)
     const rows = historyRows.value.filter((row) => utcDateKey(row.created_at) === key)
     const income = rows.filter((row) => isCountedTowardDaily(row) && Number(row.amount) > 0).reduce((sum, row) => sum + Number(row.amount), 0)
     const expense = rows.filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0)
@@ -438,8 +432,8 @@ watch(todayTotalPages, (pages) => {
 async function submit() {
   const raw = input.value.trim()
   if (!raw) return
-  const amount = Math.abs(Number(raw.replace(/[, ]/g, '')))
-  if (Number.isNaN(amount) || amount === 0) {
+  const amount = parseMoney(raw)
+  if (!amount) {
     error.value = 'Nhập số dạng -25000 hoặc +30000'
     return
   }
@@ -567,8 +561,8 @@ async function removeTag(tag) {
 
 async function saveBalance() {
   const raw = balanceInput.value.trim()
-  const targetBalance = Number(raw.replace(/[, ]/g, ''))
-  if (!raw || Number.isNaN(targetBalance)) {
+  const targetBalance = parseSignedMoney(raw)
+  if (targetBalance === null) {
     error.value = 'Nhập số dư hợp lệ'
     return
   }
@@ -712,7 +706,7 @@ async function confirmRemove() {
 }
 
 function fmt(n) {
-  return new Intl.NumberFormat('vi-VN').format(n)
+  return formatMoney(n)
 }
 
 function isCountedTowardDaily(entry) {
@@ -772,6 +766,15 @@ function setAppearance(value) {
   appearance.value = value
   try {
     localStorage.setItem('dmoney-appearance', value)
+  } catch (e) {
+    // Giao diện vẫn áp dụng trong phiên hiện tại.
+  }
+}
+
+function setDayResetTimeZone(value) {
+  dayResetTimeZone.value = value
+  try {
+    localStorage.setItem('dmoney-day-reset-time-zone', value)
   } catch (e) {
     // Giao diện vẫn áp dụng trong phiên hiện tại.
   }
@@ -977,8 +980,10 @@ const detailVisibleRange = computed(() => {
       :open="settingsOpen"
       :is-local-environment="isLocalEnvironment"
       :appearance="appearance"
+      :day-reset-time-zone="dayResetTimeZone"
       @close="settingsOpen = false"
       @update:appearance="setAppearance"
+      @update:day-reset-time-zone="setDayResetTimeZone"
       @open-tag-manager="settingsOpen = false; openTagModal()"
       @sign-out="handleSignOut"
     />

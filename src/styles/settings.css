@@ -108,6 +108,21 @@
   cursor: pointer;
   font: 600 12px 'Inter', sans-serif;
 }
+.time-zone-field {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-faint);
+  font: 12px 'Inter', sans-serif;
+}
+.time-zone-field select {
+  width: 100%;
+  padding: 9px 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper-card);
+  color: var(--ink);
+  font: 13px 'Inter', sans-serif;
+}
 .settings-btn {
   display: inline-flex;
   align-items: center;
