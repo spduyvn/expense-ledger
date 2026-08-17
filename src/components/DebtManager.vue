@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 
-const props = defineProps({ open: Boolean, debts: Array, balancesHidden: Boolean, formatAmount: Function, error: String })
+const props = defineProps({ open: Boolean, debts: Array, balancesHidden: Boolean, formatAmount: Function, error: String, moneyUnit: { type: String, default: 'k' } })
 const emit = defineEmits(['close', 'create', 'increase', 'pay', 'edit', 'delete', 'save-plan', 'delete-plan'])
 const mode = ref('list')
 const selectedId = ref(null)
@@ -20,7 +20,7 @@ watch(() => props.open, (open) => { if (open) resetForm() })
 
 function currentMonth() { const now = new Date(); return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}` }
 function monthLabel(month) { return `${month.slice(5, 7)}/${month.slice(0, 4)}` }
-function parseAmount(value) { const parsed = Math.abs(Number(String(value).trim().replace(/[, ]/g, ''))); return Number.isFinite(parsed) && parsed > 0 ? parsed : null }
+function parseAmount(value) { const raw = String(value).trim().replace(/k$/i, '').replace(/[., ]/g, ''); const parsed = Math.abs(Number(raw)) * (/k$/i.test(String(value).trim()) || props.moneyUnit === 'k' ? 1000 : 1); return Number.isFinite(parsed) && parsed > 0 ? parsed : null }
 function resetForm() { mode.value = 'list'; selectedId.value = null; name.value = ''; amount.value = ''; note.value = ''; planMonth.value = currentMonth(); planAmount.value = ''; paymentAccount.value = 'bank'; plans.value = []; editingPlanMonth.value = null; confirmation.value = null }
 function openDebt(debt) { selectedId.value = debt.id; mode.value = 'detail' }
 function startCreate() { name.value = ''; amount.value = ''; note.value = ''; plans.value = []; mode.value = 'create' }
