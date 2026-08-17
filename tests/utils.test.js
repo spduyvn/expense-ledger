@@ -9,6 +9,9 @@ test('parseMoney handles common Vietnamese amount formats', () => {
   assert.equal(parseMoney('1.234.567'), 1234567)
   assert.equal(parseSignedMoney('-2.500'), -2500)
   assert.equal(parseMoney('0'), null)
+  assert.equal(parseMoney('29k', 'k'), 29000)
+  assert.equal(parseMoney('20', 'k'), 20000)
+  assert.equal(parseMoney('29k', 'vnd'), 29000)
 })
 
 test('date utilities use the requested timezone', () => {

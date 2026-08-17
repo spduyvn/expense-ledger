@@ -3,6 +3,7 @@ defineProps({
   dailyBalance: { type: Number, required: true }, dailyIncome: { type: Number, required: true }, dailyExpense: { type: Number, required: true },
   todayRows: { type: Array, required: true }, paginatedRows: { type: Array, required: true }, page: { type: Number, required: true }, totalPages: { type: Number, required: true }, visibleRange: { type: String, required: true }, pageSize: { type: Number, required: true },
   formatAmount: { type: Function, required: true }, formatTime: { type: Function, required: true }, accountLabel: { type: Function, required: true }
+  , deletingEntryId: { type: String, default: null }
 })
 defineEmits(['update:page', 'request-remove'])
 </script>
@@ -13,7 +14,7 @@ defineEmits(['update:page', 'request-remove'])
     <div v-if="!todayRows.length" class="empty">Hôm nay chưa có giao dịch nào.</div>
     <div v-else class="day-group">
       <div class="day-label"><span>Giao dịch hôm nay</span><span class="rule"></span></div>
-      <button v-for="row in paginatedRows" :key="row.id" type="button" class="row" :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${formatAmount(row.amount)}`" @click="$emit('request-remove', row)">
+      <button v-for="row in paginatedRows" :key="row.id" type="button" class="row" :disabled="deletingEntryId === row.id" :aria-label="`Xoá giao dịch ${row.note || 'không có ghi chú'}, ${formatAmount(row.amount)}`" @click="$emit('request-remove', row)">
         <span class="transaction-icon" :class="row.amount < 0 ? 'expense' : 'income'" aria-hidden="true">
           <svg v-if="row.amount < 0" viewBox="0 0 24 24"><path d="M7 7h10v10M17 7 7 17" /></svg>
           <svg v-else viewBox="0 0 24 24"><path d="M7 17h10V7M7 17 17 7" /></svg>

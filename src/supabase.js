@@ -78,7 +78,7 @@ export async function fetchTags() {
 export async function addTags(names) {
   const { data, error } = await supabase
     .from('tags')
-    .insert(names.map((name) => ({ name })))
+    .upsert(names.map((name) => ({ name })), { onConflict: 'user_id,name', ignoreDuplicates: true })
     .select()
   if (error) throw error
   return data

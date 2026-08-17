@@ -3,10 +3,11 @@ defineProps({
   open: { type: Boolean, required: true },
   isLocalEnvironment: { type: Boolean, required: true },
   appearance: { type: String, required: true },
-  dayResetTimeZone: { type: String, required: true }
+  dayResetTimeZone: { type: String, required: true },
+  moneyUnit: { type: String, required: true }
 })
 
-defineEmits(['close', 'update:appearance', 'update:day-reset-time-zone', 'open-tag-manager', 'sign-out'])
+defineEmits(['close', 'update:appearance', 'update:day-reset-time-zone', 'update:money-unit', 'open-tag-manager', 'sign-out'])
 </script>
 
 <template>
@@ -40,6 +41,15 @@ defineEmits(['close', 'update:appearance', 'update:day-reset-time-zone', 'open-t
             <span class="appearance-preview" aria-hidden="true"><i></i><i></i><i></i></span>
             <span><strong>Thoáng</strong><small>Tông xanh dịu, giao diện sáng và tối giản.</small></span>
           </button>
+        </div>
+      </section>
+
+      <section class="settings-section" aria-labelledby="money-unit-title">
+        <h3 id="money-unit-title">Đơn vị tiền</h3>
+        <p>Chọn cách nhập và hiển thị. 1k tương đương 1.000 đồng; ví dụ 29k = 29.000 đồng.</p>
+        <div class="unit-options" role="radiogroup" aria-label="Đơn vị tiền">
+          <button type="button" :class="{ active: moneyUnit === 'k' }" role="radio" :aria-checked="moneyUnit === 'k'" @click="$emit('update:money-unit', 'k')">k · 1k = 1.000 đ</button>
+          <button type="button" :class="{ active: moneyUnit === 'vnd' }" role="radio" :aria-checked="moneyUnit === 'vnd'" @click="$emit('update:money-unit', 'vnd')">đ · Nhập đủ đồng</button>
         </div>
       </section>
 

@@ -8,7 +8,8 @@ import HistoryPage from './components/HistoryPage.vue'
 import AppDialogs from './components/AppDialogs.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import DebtManager from './components/DebtManager.vue'
-import { addDays, dateKey, isSameDay, browserTimeZone, monthKey, weekStartKey } from './utils/date'
+import ToastStack from './components/ToastStack.vue'
+import { addDays, dateKey, formatDate, isSameDay, browserTimeZone, monthKey, weekStartKey } from './utils/date'
 import { formatMoney, parseMoney, parseSignedMoney } from './utils/money'
 import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, updateDebtAccount, deleteDebtAccount, saveDebtPlan, deleteDebtPlan, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
@@ -55,6 +56,9 @@ const debtManagerOpen = ref(false)
 const settingsOpen = ref(false)
 const appearance = ref('ledger')
 const dayResetTimeZone = ref(browserTimeZone())
+const moneyUnit = ref('k')
+const toasts = ref([])
+const actionLoading = ref({})
 const pageSize = 10
 const accountTypes = [
   { value: 'cash', label: 'Tiền mặt' },
@@ -71,6 +75,27 @@ const isLocalEnvironment = import.meta.env.VITE_APP_ENV === 'local'
 
 let authSubscription
 let dailyInfoTimer
+let loadVersion = 0
+let toastId = 0
+
+function pushToast(message, type = 'error') {
+  const id = ++toastId
+  toasts.value.push({ id, message, type })
+  setTimeout(() => dismissToast(id), 4500)
+}
+
+function notifyError(message) {
+  error.value = ''
+  pushToast(message)
+}
+
+function dismissToast(id) {
+  toasts.value = toasts.value.filter((toast) => toast.id !== id)
+}
+
+function setActionLoading(key, value) {
+  actionLoading.value = { ...actionLoading.value, [key]: value }
+}
 
 onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
@@ -81,6 +106,8 @@ onMounted(async () => {
     if (['ledger', 'modern', 'midnight', 'breeze'].includes(savedAppearance)) appearance.value = savedAppearance
     const savedDayResetTimeZone = localStorage.getItem('dmoney-day-reset-time-zone')
     if (savedDayResetTimeZone) dayResetTimeZone.value = savedDayResetTimeZone
+    const savedMoneyUnit = localStorage.getItem('dmoney-money-unit')
+    if (savedMoneyUnit === 'k' || savedMoneyUnit === 'vnd') moneyUnit.value = savedMoneyUnit
   } catch (e) {
     // Giữ trạng thái mặc định nếu trình duyệt chặn localStorage.
   }
@@ -91,7 +118,7 @@ onMounted(async () => {
     if (isLocalEnvironment) {
       localAuthError.value = 'Không thể tạo phiên test local. Hãy bật Anonymous Sign-Ins trong Supabase Authentication → Providers → Anonymous.'
     } else {
-      error.value = 'Không kiểm tra được trạng thái đăng nhập. Vui lòng thử lại.'
+    notifyError('Không kiểm tra được trạng thái đăng nhập. Vui lòng thử lại.')
     }
   } finally {
     authLoading.value = false
@@ -130,9 +157,11 @@ async function getLocalSession() {
 }
 
 async function load() {
+  const version = ++loadVersion
   loading.value = true
   try {
     const [loadedEntries, loadedTags, loadedDebtData] = await Promise.all([fetchEntries(), fetchTags(), fetchDebtData()])
+    if (version !== loadVersion) return
     entries.value = loadedEntries
     tags.value = loadedTags
     debtAccounts.value = loadedDebtData.accounts
@@ -140,7 +169,7 @@ async function load() {
     debtPlans.value = loadedDebtData.plans
     await seedDefaultTags()
   } catch (e) {
-    error.value = 'Không tải được sổ. Kiểm tra kết nối Supabase.'
+    notifyError('Không tải được sổ. Kiểm tra kết nối Supabase.')
   } finally {
     loading.value = false
   }
@@ -157,7 +186,7 @@ async function handleSignOut() {
     settingsOpen.value = false
     await signOut()
   } catch (e) {
-    error.value = 'Không thể đăng xuất. Vui lòng thử lại.'
+    notifyError('Không thể đăng xuất. Vui lòng thử lại.')
   }
 }
 
@@ -209,10 +238,6 @@ function isSameUtcDay(value, date) {
   return isSameDay(value, date, dayResetTimeZone.value)
 }
 
-function startOfUtcDay(date = new Date()) {
-  return utcDateKey(date)
-}
-
 function isInHistoryPeriod(value) {
   const rowKey = utcDateKey(value)
   const today = utcDateKey()
@@ -231,20 +256,19 @@ function isInCurrentMonth(value) {
 }
 
 function fmtTime(value) {
-  return new Intl.DateTimeFormat('vi-VN', {
+  return formatDate(value, dayResetTimeZone.value, {
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
-    timeZone: 'Asia/Ho_Chi_Minh'
-  }).format(new Date(value))
+    hour12: false
+  })
 }
 
 function groupByDay(rows) {
   const groups = []
   let currentDay = null
   for (const row of rows) {
-    const day = new Date(row.created_at).toLocaleDateString('vi-VN', {
-      weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC'
+    const day = formatDate(row.created_at, dayResetTimeZone.value, {
+      weekday: 'short', day: '2-digit', month: '2-digit'
     })
     if (day !== currentDay) {
       groups.push({ day, rows: [] })
@@ -303,14 +327,26 @@ const dailyExpense = computed(() => todayRows.value
   .filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0)
   .reduce((total, row) => total + Math.abs(Number(row.amount)), 0))
 const currentDebtMonth = computed(() => `${monthKey(new Date(), dayResetTimeZone.value)}-01`)
-const debts = computed(() => debtAccounts.value.map((account) => {
-  const entries = debtEntries.value.filter((entry) => entry.debt_id === account.id)
-  const plans = debtPlans.value.filter((plan) => plan.debt_id === account.id)
+const debts = computed(() => {
+  const entriesByDebt = new Map()
+  const plansByDebt = new Map()
+  for (const entry of debtEntries.value) {
+    if (!entriesByDebt.has(entry.debt_id)) entriesByDebt.set(entry.debt_id, [])
+    entriesByDebt.get(entry.debt_id).push(entry)
+  }
+  for (const plan of debtPlans.value) {
+    if (!plansByDebt.has(plan.debt_id)) plansByDebt.set(plan.debt_id, [])
+    plansByDebt.get(plan.debt_id).push(plan)
+  }
+  return debtAccounts.value.map((account) => {
+  const entries = entriesByDebt.get(account.id) || []
+  const plans = plansByDebt.get(account.id) || []
   const balance = entries.reduce((total, entry) => total + Number(entry.amount), 0)
   const monthPlanned = plans.filter((plan) => plan.month === currentDebtMonth.value).reduce((total, plan) => total + Number(plan.planned_amount), 0)
   const monthPaid = entries.filter((entry) => entry.entry_type === 'payment' && String(entry.occurred_at).slice(0, 7) === currentDebtMonth.value.slice(0, 7)).reduce((total, entry) => total + Math.abs(Number(entry.amount)), 0)
   return { ...account, entries, plans: plans.map((plan) => ({ month: plan.month, amount: Number(plan.planned_amount) })), balance, monthPlanned, monthPaid, monthRemaining: Math.max(0, monthPlanned - monthPaid) }
-}).filter((debt) => debt.balance > 0))
+  }).filter((debt) => debt.balance > 0)
+})
 const currentDebt = computed(() => debts.value.reduce((total, debt) => total + debt.balance, 0))
 const currentMonthDebt = computed(() => debts.value.reduce((total, debt) => total + debt.monthRemaining, 0))
 const todayTotalPages = computed(() => Math.max(1, Math.ceil(todayRows.value.length / pageSize)))
@@ -432,16 +468,17 @@ watch(todayTotalPages, (pages) => {
 async function submit() {
   const raw = input.value.trim()
   if (!raw) return
-  const amount = parseMoney(raw)
+  const amount = parseMoney(raw, moneyUnit.value)
   if (!amount) {
-    error.value = 'Nhập số dạng -25000 hoặc +30000'
+    notifyError('Nhập số dạng -25000 hoặc +30000')
     return
   }
   if (!selectedAccountType.value) {
-    error.value = 'Chọn nguồn tiền trước khi ghi sổ'
+    notifyError('Chọn nguồn tiền trước khi ghi sổ')
     return
   }
   error.value = ''
+  setActionLoading('entry', true)
   try {
     const created = await addEntry(
       amount * entryDirection.value,
@@ -460,13 +497,16 @@ async function submit() {
     currentPage.value = 1
     todayPage.value = 1
   } catch (e) {
-    error.value = 'Không lưu được. Thử lại.'
+    notifyError('Không lưu được. Thử lại.')
+    pushToast(error.value)
+  } finally {
+    setActionLoading('entry', false)
   }
 }
 
 function startBalanceEdit() {
   if (!selectedAccountType.value) {
-    error.value = 'Chọn nguồn tiền trước khi điều chỉnh số dư'
+    notifyError('Chọn nguồn tiền trước khi điều chỉnh số dư')
     return
   }
   balanceInput.value = String(balancesByAccount.value[selectedAccountType.value])
@@ -507,11 +547,11 @@ function cancelTagEdit() {
 function validateTagName(name, excludeId = null) {
   const trimmedName = name.trim()
   if (!trimmedName) {
-    error.value = 'Nhập tên thẻ'
+    notifyError('Nhập tên thẻ')
     return null
   }
   if (tags.value.some((tag) => tag.id !== excludeId && normalizeSearch(tag.name) === normalizeSearch(trimmedName))) {
-    error.value = 'Thẻ này đã tồn tại'
+    notifyError('Thẻ này đã tồn tại')
     return null
   }
   return trimmedName
@@ -526,7 +566,7 @@ async function submitTag() {
     tags.value = [...tags.value, ...createdTags].sort((a, b) => a.name.localeCompare(b.name, 'vi'))
     tagInput.value = ''
   } catch (e) {
-    error.value = 'Không thể thêm thẻ. Thử lại.'
+    notifyError('Không thể thêm thẻ. Thử lại.')
   }
 }
 
@@ -542,7 +582,7 @@ async function saveTag(tag) {
     if (selectedTag.value === oldName) selectedTag.value = updatedTag.name
     cancelTagEdit()
   } catch (e) {
-    error.value = 'Không thể sửa thẻ. Thử lại.'
+    notifyError('Không thể sửa thẻ. Thử lại.')
   }
 }
 
@@ -555,20 +595,20 @@ async function removeTag(tag) {
     if (selectedTag.value === tag.name) selectedTag.value = null
     if (editingTagId.value === tag.id) cancelTagEdit()
   } catch (e) {
-    error.value = 'Không thể xoá thẻ. Thử lại.'
+    notifyError('Không thể xoá thẻ. Thử lại.')
   }
 }
 
 async function saveBalance() {
   const raw = balanceInput.value.trim()
-  const targetBalance = parseSignedMoney(raw)
+  const targetBalance = parseSignedMoney(raw, moneyUnit.value)
   if (targetBalance === null) {
-    error.value = 'Nhập số dư hợp lệ'
+    notifyError('Nhập số dư hợp lệ')
     return
   }
 
   if (!selectedAccountType.value) {
-    error.value = 'Chọn nguồn tiền trước khi điều chỉnh số dư'
+    notifyError('Chọn nguồn tiền trước khi điều chỉnh số dư')
     return
   }
 
@@ -580,6 +620,7 @@ async function saveBalance() {
 
   error.value = ''
   savingBalance.value = true
+  setActionLoading('balance', true)
   try {
     const created = await addEntry(
       adjustment,
@@ -593,15 +634,17 @@ async function saveBalance() {
     currentPage.value = 1
     todayPage.value = 1
   } catch (e) {
-    error.value = 'Không cập nhật được số dư. Thử lại.'
+    notifyError('Không cập nhật được số dư. Thử lại.')
+    pushToast(error.value)
   } finally {
     savingBalance.value = false
+    setActionLoading('balance', false)
   }
 }
 
 function requestRemove(entry) {
   if (activeView.value !== 'today' || !isSameUtcDay(entry.created_at, new Date())) {
-    error.value = 'Chỉ có thể xoá giao dịch hôm nay trong tab Hôm nay.'
+    notifyError('Chỉ có thể xoá giao dịch hôm nay trong tab Hôm nay.')
     return
   }
   confirmingEntry.value = entry
@@ -623,7 +666,7 @@ async function createDebt(payload) {
     await load()
     closeDebtManager()
   } catch (e) {
-    error.value = 'Không thể tạo khoản nợ. Vui lòng thử lại.'
+    notifyError('Không thể tạo khoản nợ. Vui lòng thử lại.')
   }
 }
 
@@ -633,7 +676,7 @@ async function increaseDebt(payload) {
     await addDebtIncrease(payload.debtId, payload.amount, payload.note, payload.plans)
     await load()
   } catch (e) {
-    error.value = 'Không thể ghi phát sinh nợ. Vui lòng thử lại.'
+    notifyError('Không thể ghi phát sinh nợ. Vui lòng thử lại.')
   }
 }
 
@@ -643,7 +686,7 @@ async function submitDebtPayment(payload) {
     await payDebt(payload.debtId, payload.amount, payload.accountType, payload.note)
     await load()
   } catch (e) {
-    error.value = 'Không thể thanh toán nợ. Kiểm tra số dư nợ rồi thử lại.'
+    notifyError('Không thể thanh toán nợ. Kiểm tra số dư nợ rồi thử lại.')
   }
 }
 
@@ -653,7 +696,7 @@ async function editDebt(payload) {
     await updateDebtAccount(payload.debtId, payload.name, payload.note)
     await load()
   } catch (e) {
-    error.value = 'Không thể cập nhật khoản nợ. Vui lòng thử lại.'
+    notifyError('Không thể cập nhật khoản nợ. Vui lòng thử lại.')
   }
 }
 
@@ -663,7 +706,7 @@ async function removeDebt(payload) {
     await deleteDebtAccount(payload.debtId)
     await load()
   } catch (e) {
-    error.value = 'Không thể xoá khoản nợ. Vui lòng thử lại.'
+    notifyError('Không thể xoá khoản nợ. Vui lòng thử lại.')
   }
 }
 
@@ -673,7 +716,7 @@ async function updateDebtPlan(payload) {
     await saveDebtPlan(payload.debtId, payload.month, payload.amount)
     await load()
   } catch (e) {
-    error.value = 'Không thể lưu lịch trả. Vui lòng thử lại.'
+    notifyError('Không thể lưu lịch trả. Vui lòng thử lại.')
   }
 }
 
@@ -683,7 +726,7 @@ async function removeDebtPlan(payload) {
     await deleteDebtPlan(payload.debtId, payload.month)
     await load()
   } catch (e) {
-    error.value = 'Không thể xoá lịch trả. Vui lòng thử lại.'
+    notifyError('Không thể xoá lịch trả. Vui lòng thử lại.')
   }
 }
 
@@ -696,17 +739,30 @@ async function confirmRemove() {
   if (!entry) return
 
   confirmingEntry.value = null
+  setActionLoading('delete-entry', entry.id)
   entries.value = entries.value.filter((e) => e.id !== entry.id)
   try {
     await deleteEntry(entry.id)
   } catch (e) {
-    error.value = 'Không xoá được trên máy chủ.'
-    load()
+    notifyError('Không xoá được trên máy chủ.')
+    pushToast(error.value)
+    await load()
+  } finally {
+    setActionLoading('delete-entry', false)
   }
 }
 
 function fmt(n) {
-  return formatMoney(n)
+  return formatMoney(n, moneyUnit.value)
+}
+
+function setMoneyUnit(value) {
+  moneyUnit.value = value
+  try {
+    localStorage.setItem('dmoney-money-unit', value)
+  } catch (e) {
+    // Vẫn áp dụng trong phiên hiện tại nếu localStorage bị chặn.
+  }
 }
 
 function isCountedTowardDaily(entry) {
@@ -848,6 +904,8 @@ const detailVisibleRange = computed(() => {
           v-model:selected-tag="selectedTag"
           v-model:entry-direction="entryDirection"
           v-model:counts-toward-daily="countsTowardDaily"
+          :loading="actionLoading.entry"
+          :money-unit="moneyUnit"
           :account-types="accountTypes"
           :tags="tags"
           @submit="submit"
@@ -862,7 +920,7 @@ const detailVisibleRange = computed(() => {
             inputmode="decimal"
             aria-label="Số dư hiện tại"
           />
-          <button type="submit" class="save-balance-btn" :disabled="savingBalance">
+          <button type="submit" class="save-balance-btn" :disabled="savingBalance || actionLoading.balance">
             {{ savingBalance ? 'Đang lưu…' : 'Lưu số dư' }}
           </button>
           <button type="button" class="cancel-balance-btn" :disabled="savingBalance" @click="cancelBalanceEdit">
@@ -896,6 +954,7 @@ const detailVisibleRange = computed(() => {
             :format-amount="fmt"
             :format-time="fmtTime"
             :account-label="accountLabel"
+            :deleting-entry-id="actionLoading['delete-entry']"
             @request-remove="requestRemove"
           />
 
@@ -947,6 +1006,7 @@ const detailVisibleRange = computed(() => {
       :balances-hidden="balancesHidden"
       :error="error"
       :format-amount="fmt"
+      :money-unit="moneyUnit"
       :format-time="fmtTime"
       :account-label="accountLabel"
       @cancel-remove="cancelRemove"
@@ -980,13 +1040,16 @@ const detailVisibleRange = computed(() => {
       :open="settingsOpen"
       :is-local-environment="isLocalEnvironment"
       :appearance="appearance"
-      :day-reset-time-zone="dayResetTimeZone"
+          :day-reset-time-zone="dayResetTimeZone"
+          :money-unit="moneyUnit"
       @close="settingsOpen = false"
       @update:appearance="setAppearance"
-      @update:day-reset-time-zone="setDayResetTimeZone"
+          @update:day-reset-time-zone="setDayResetTimeZone"
+          @update:money-unit="setMoneyUnit"
       @open-tag-manager="settingsOpen = false; openTagModal()"
       @sign-out="handleSignOut"
     />
+    <ToastStack :toasts="toasts" @dismiss="dismissToast" />
 
   </div>
 </template>

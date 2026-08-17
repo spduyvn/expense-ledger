@@ -1002,6 +1002,12 @@
   background: var(--red);
   color: var(--paper-card);
 }
+
+.toast-stack { position: fixed; z-index: 30; right: 16px; bottom: 16px; display: grid; gap: 8px; width: min(360px, calc(100vw - 32px)); }
+.toast { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 12px; border: 1px solid var(--rule-strong); border-radius: 8px; background: var(--paper-card); color: var(--ink); box-shadow: 0 8px 24px rgba(43,42,40,.16); font: 12px/1.4 var(--font-ui); }
+.toast-error { border-color: rgba(166,54,44,.45); color: var(--red); }
+.toast-success { border-color: rgba(23,107,69,.4); color: var(--green); }
+.toast button { margin: 0; padding: 0 4px; border: 0; background: transparent; color: inherit; font-size: 18px; cursor: pointer; }
 .transaction-icon {
   display: none;
 }
