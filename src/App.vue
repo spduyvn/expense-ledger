@@ -347,8 +347,9 @@ const debts = computed(() => {
   return { ...account, entries, plans: plans.map((plan) => ({ month: plan.month, amount: Number(plan.planned_amount) })), balance, monthPlanned, monthPaid, monthRemaining: Math.max(0, monthPlanned - monthPaid) }
   }).filter((debt) => debt.balance > 0)
 })
-const currentDebt = computed(() => debts.value.reduce((total, debt) => total + debt.balance, 0))
-const currentMonthDebt = computed(() => debts.value.reduce((total, debt) => total + debt.monthRemaining, 0))
+const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
+const currentDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.balance, 0))
+const currentMonthDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.monthRemaining, 0))
 const todayTotalPages = computed(() => Math.max(1, Math.ceil(todayRows.value.length / pageSize)))
 const paginatedTodayRows = computed(() => {
   const start = (todayPage.value - 1) * pageSize
@@ -662,7 +663,7 @@ function closeDebtManager() {
 async function createDebt(payload) {
   error.value = ''
   try {
-    await createDebtAccount(payload.name, payload.note, payload.amount, payload.plans)
+    await createDebtAccount(payload.name, payload.note, payload.amount, payload.plans, payload.debtType, payload.dueDate)
     await load()
     closeDebtManager()
   } catch (e) {

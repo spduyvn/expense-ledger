@@ -19,7 +19,7 @@
 
 .passbook {
   width: 100%;
-  max-width: 480px;
+  max-width: 680px;
   display: flex;
   background: var(--paper-card);
   border-radius: 6px;
@@ -48,7 +48,7 @@
 
 .sheet {
   flex: 1;
-  padding: 28px 24px 20px;
+  padding: 32px 30px 24px;
   min-width: 0;
 }
 
@@ -78,6 +78,19 @@
 .settings-btn:hover {
   background: rgba(156, 122, 60, 0.1);
   border-color: var(--brass);
+}
+.settings-btn:focus-visible,
+.edit-balance-btn:focus-visible,
+.entry-direction button:focus-visible,
+.choice-group button:focus-visible,
+.view-tabs button:focus-visible,
+.history-filters button:focus-visible,
+.pagination button:focus-visible,
+.row:focus-visible,
+.day-summary-row:focus-visible,
+.bar-column:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
 }
 .eyebrow {
   font-family: 'Inter', sans-serif;
@@ -435,6 +448,18 @@
   font-size: 11px;
   cursor: pointer;
 }
+.entry-direction button,
+.choice-group button,
+.pagination button,
+.history-filters button,
+.view-tabs button,
+.settings-btn,
+.edit-balance-btn,
+.add-btn,
+.save-balance-btn,
+.debt-add-btn {
+  min-height: 36px;
+}
 .entry-direction button.active,
 .choice-group button.active {
   border-color: var(--brass);
@@ -625,6 +650,12 @@
 }
 .add-btn:hover {
   background: var(--brass);
+}
+.add-btn:disabled,
+.save-balance-btn:disabled,
+.debt-add-btn:disabled {
+  cursor: wait;
+  opacity: .65;
 }
 
 .balance-form {
@@ -1107,4 +1138,36 @@
   .balance-total-amount, .balance-source-amount, .debt-summary strong, .row-amount, .row-balance {
     min-width: 0;
   }
+}
+
+/* Keep the compact ledger comfortable on very small phones. */
+@media (max-width: 380px) {
+  .page { padding: 8px 0; }
+  .passbook { border-right: 0; border-left: 0; border-radius: 0; }
+  .spine { width: 14px; }
+  .sheet { padding: 18px 11px 16px; }
+  .head-meta { align-items: flex-start; }
+  .settings-btn { padding: 7px 9px; }
+  .amount-row,
+  .note-daily-row { flex-direction: column; align-items: stretch; }
+  .entry-direction { display: grid; grid-template-columns: 1fr 1fr; }
+  .entry-direction button { min-height: 38px; }
+  .daily-toggle-control { min-height: 38px; }
+  .daily-toggle { justify-content: space-between; min-height: 38px; padding: 0 10px; }
+  .add-btn { min-height: 42px; }
+  .daily-balance { flex-direction: column; gap: 5px; }
+  .daily-balance-values { justify-items: start; text-align: left; }
+  .daily-breakdown { justify-content: flex-start; }
+  .row { grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 11px 1px; }
+  .row-time { grid-column: 1; grid-row: 2; font-size: 10px; }
+  .row-amount { grid-column: 2; grid-row: 1 / span 2; min-width: 0; font-size: 12px; }
+  .row-note { min-width: 0; }
+  .pagination-controls { width: 100%; justify-content: space-between; }
+}
+
+@media (min-width: 900px) {
+  .page { padding: 48px 24px; }
+  .sheet { padding: 36px 38px 28px; }
+  .entry-form { gap: 9px; }
+  .row { padding-top: 10px; padding-bottom: 10px; }
 }
