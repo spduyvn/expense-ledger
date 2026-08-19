@@ -116,12 +116,14 @@ async function callDebtRpc(name, args) {
   if (error) throw error
 }
 
-export function createDebtAccount(name, note, openingAmount, plans) {
+export function createDebtAccount(name, note, openingAmount, plans, debtType = 'owed', dueDate = null) {
   return callDebtRpc('create_debt_account', {
     p_name: name,
     p_note: note,
     p_opening_amount: openingAmount,
-    p_plans: plans
+    p_plans: plans,
+    p_debt_type: debtType,
+    p_due_date: dueDate
   })
 }
 

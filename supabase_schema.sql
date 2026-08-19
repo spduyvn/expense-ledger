@@ -161,8 +161,25 @@ create table if not exists debt_accounts (
   note text,
   user_id uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz not null default now(),
-  closed_at timestamptz
+  closed_at timestamptz,
+  debt_type text not null default 'owed' check (debt_type in ('owed', 'lent')),
+  due_date date
 );
+
+alter table debt_accounts add column if not exists debt_type text;
+update debt_accounts set debt_type = 'owed' where debt_type is null;
+alter table debt_accounts alter column debt_type set default 'owed';
+alter table debt_accounts alter column debt_type set not null;
+alter table debt_accounts add column if not exists due_date date;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'debt_accounts_debt_type_check') then
+    alter table debt_accounts
+      add constraint debt_accounts_debt_type_check
+      check (debt_type in ('owed', 'lent'));
+  end if;
+end $$;
 
 create table if not exists debt_entries (
   id uuid primary key default gen_random_uuid(),
@@ -171,10 +188,15 @@ create table if not exists debt_entries (
   entry_type text not null check (entry_type in ('opening', 'increase', 'payment', 'adjustment')),
   note text,
   occurred_at timestamptz not null default now(),
-  ledger_entry_id uuid references entries(id),
+  ledger_entry_id uuid references entries(id) on delete set null,
   user_id uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz not null default now()
 );
+
+alter table debt_entries drop constraint if exists debt_entries_ledger_entry_id_fkey;
+alter table debt_entries
+  add constraint debt_entries_ledger_entry_id_fkey
+  foreign key (ledger_entry_id) references entries(id) on delete set null;
 
 create table if not exists debt_month_plans (
   id uuid primary key default gen_random_uuid(),
@@ -210,7 +232,9 @@ create or replace function create_debt_account(
   p_name text,
   p_note text,
   p_opening_amount numeric,
-  p_plans jsonb default '[]'::jsonb
+  p_plans jsonb default '[]'::jsonb,
+  p_debt_type text default 'owed',
+  p_due_date date default null
 ) returns uuid
 language plpgsql
 security invoker
@@ -219,14 +243,22 @@ as $$
 declare
   v_debt_id uuid;
   v_plan jsonb;
+  v_ledger_entry_id uuid;
 begin
-  if auth.uid() is null or coalesce(trim(p_name), '') = '' or p_opening_amount <= 0 then
+  if auth.uid() is null or coalesce(trim(p_name), '') = '' or p_opening_amount <= 0
+    or p_debt_type not in ('owed', 'lent') then
     raise exception 'Thông tin khoản nợ không hợp lệ';
   end if;
 
-  insert into debt_accounts (name, note) values (trim(p_name), p_note) returning id into v_debt_id;
-  insert into debt_entries (debt_id, amount, entry_type, note)
-  values (v_debt_id, p_opening_amount, 'opening', coalesce(p_note, 'Dư nợ ban đầu'));
+  insert into debt_accounts (name, note, debt_type, due_date)
+  values (trim(p_name), p_note, p_debt_type, p_due_date) returning id into v_debt_id;
+  if p_debt_type = 'lent' then
+    insert into entries (amount, note, account_type, entry_type, counts_toward_daily)
+    values (-p_opening_amount, coalesce(p_note, 'Cho vay: ' || trim(p_name)), 'bank', 'transaction', false)
+    returning id into v_ledger_entry_id;
+  end if;
+  insert into debt_entries (debt_id, amount, entry_type, note, ledger_entry_id)
+  values (v_debt_id, p_opening_amount, 'opening', coalesce(p_note, case when p_debt_type = 'lent' then 'Cho vay ban đầu' else 'Dư nợ ban đầu' end), v_ledger_entry_id);
 
   for v_plan in select value from jsonb_array_elements(coalesce(p_plans, '[]'::jsonb)) loop
     insert into debt_month_plans (debt_id, month, planned_amount)
@@ -279,9 +311,10 @@ declare
   v_balance numeric;
   v_ledger_entry_id uuid;
   v_name text;
+  v_debt_type text;
 begin
-  select coalesce(sum(amount), 0), max(debt_accounts.name)
-  into v_balance, v_name
+  select coalesce(sum(amount), 0), max(debt_accounts.name), max(debt_accounts.debt_type)
+  into v_balance, v_name, v_debt_type
   from debt_entries
   join debt_accounts on debt_accounts.id = debt_entries.debt_id
   where debt_entries.debt_id = p_debt_id and debt_entries.user_id = auth.uid()
@@ -295,11 +328,17 @@ begin
   end if;
 
   insert into entries (amount, note, account_type, entry_type, counts_toward_daily)
-  values (-p_amount, coalesce(p_note, 'Trả nợ: ' || v_name), p_account_type, 'transaction', false)
+  values (
+    case when v_debt_type = 'lent' then p_amount else -p_amount end,
+    coalesce(p_note, case when v_debt_type = 'lent' then 'Thu hồi khoản vay: ' else 'Trả nợ: ' end || v_name),
+    p_account_type,
+    'transaction',
+    false
+  )
   returning id into v_ledger_entry_id;
 
   insert into debt_entries (debt_id, amount, entry_type, note, ledger_entry_id)
-  values (p_debt_id, -p_amount, 'payment', coalesce(p_note, 'Thanh toán: ' || v_name), v_ledger_entry_id);
+  values (p_debt_id, -p_amount, 'payment', coalesce(p_note, case when v_debt_type = 'lent' then 'Thu hồi: ' else 'Thanh toán: ' end || v_name), v_ledger_entry_id);
 end;
 $$;
 
@@ -329,9 +368,10 @@ security invoker
 set search_path = public
 as $$
 begin
-  if exists (select 1 from debt_entries where debt_id = p_debt_id and ledger_entry_id is not null and user_id = auth.uid()) then
-    raise exception 'Không thể xoá khoản nợ đã có thanh toán';
-  end if;
+  delete from entries where id in (
+    select ledger_entry_id from debt_entries
+    where debt_id = p_debt_id and ledger_entry_id is not null and user_id = auth.uid()
+  );
   delete from debt_accounts where id = p_debt_id and user_id = auth.uid();
   if not found then raise exception 'Không tìm thấy khoản nợ'; end if;
 end;
