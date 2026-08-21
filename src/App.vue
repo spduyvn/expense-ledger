@@ -801,6 +801,13 @@ function openEntryDetail(row) {
   selectedEntryDetail.value = row
 }
 
+function requestRemoveDetail() {
+  if (!selectedEntryDetail.value) return
+  const entry = selectedEntryDetail.value
+  selectedEntryDetail.value = null
+  confirmingEntry.value = entry
+}
+
 function closeEntryDetail() {
   selectedEntryDetail.value = null
 }
@@ -957,6 +964,7 @@ const detailVisibleRange = computed(() => {
             :account-label="accountLabel"
             :deleting-entry-id="actionLoading['delete-entry']"
             @request-remove="requestRemove"
+            @open-entry-detail="openEntryDetail"
           />
 
 
@@ -1021,6 +1029,7 @@ const detailVisibleRange = computed(() => {
       @close-details="closeDetails"
       @open-entry-detail="openEntryDetail"
       @close-entry-detail="closeEntryDetail"
+      @request-remove-detail="requestRemoveDetail"
     />
     <DebtManager
       :open="debtManagerOpen"
