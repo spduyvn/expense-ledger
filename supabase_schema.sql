@@ -14,6 +14,26 @@ create table if not exists entries (
   created_at timestamptz not null default now()
 );
 
+-- Sự kiện lưu trữ các giao dịch không tính vào thu nhập ngày.
+create table if not exists events (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  start_date date not null,
+  end_date date not null,
+  note text,
+  user_id uuid not null default auth.uid() references auth.users(id),
+  created_at timestamptz not null default now(),
+  check (end_date >= start_date)
+);
+alter table events enable row level security;
+drop policy if exists "Users can select their own events" on events;
+drop policy if exists "Users can insert their own events" on events;
+drop policy if exists "Users can delete their own events" on events;
+create policy "Users can select their own events" on events for select using (user_id = auth.uid());
+create policy "Users can insert their own events" on events for insert with check (user_id = auth.uid());
+create policy "Users can delete their own events" on events for delete using (user_id = auth.uid());
+alter table entries add column if not exists event_id uuid references events(id) on delete cascade;
+
 -- Migration cho bảng entries đã tồn tại: giao dịch cũ được xem là tiền mặt.
 alter table entries add column if not exists account_type text;
 update entries set account_type = 'cash' where account_type is null;

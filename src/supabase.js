@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js'
+﻿import { createClient } from '@supabase/supabase-js'
 
 // Set these in a .env file at project root (see README):
 // VITE_SUPABASE_URL=...
@@ -42,6 +42,23 @@ export function onAuthStateChange(callback) {
   return data.subscription
 }
 
+export async function fetchEvents() {
+  const { data, error } = await supabase.from('events').select('*').order('start_date', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function addEvent(name, startDate, endDate, note) {
+  const { data, error } = await supabase.from('events').insert({ name, start_date: startDate, end_date: endDate, note }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteEvent(id) {
+  const { error } = await supabase.from('events').delete().eq('id', id)
+  if (error) throw error
+}
+
 export async function fetchEntries() {
   const { data, error } = await supabase
     .from('entries')
@@ -51,10 +68,16 @@ export async function fetchEntries() {
   return data
 }
 
-export async function addEntry(amount, note, accountType, tag, entryType = 'transaction', countsTowardDaily = true) {
+export async function fetchEventEntries(eventId) {
+  const { data, error } = await supabase.from('entries').select('*').eq('event_id', eventId).order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function addEntry(amount, note, accountType, tag, entryType = 'transaction', countsTowardDaily = true, eventId = null, createdAt = null) {
   const { data, error } = await supabase
     .from('entries')
-    .insert({ amount, note, account_type: accountType, tag, entry_type: entryType, counts_toward_daily: countsTowardDaily })
+    .insert({ amount, note, account_type: accountType, tag, entry_type: entryType, counts_toward_daily: countsTowardDaily, event_id: eventId, ...(createdAt ? { created_at: createdAt } : {}) })
     .select()
     .single()
   if (error) throw error
@@ -160,3 +183,4 @@ export function saveDebtPlan(debtId, month, amount) {
 export function deleteDebtPlan(debtId, month) {
   return callDebtRpc('delete_debt_plan', { p_debt_id: debtId, p_month: month })
 }
+
