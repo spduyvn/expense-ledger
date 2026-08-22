@@ -96,3 +96,37 @@ RLS hiện cho phép anon đọc/ghi toàn bộ, phù hợp ứng dụng cá nh�
 1. Xem lại diff, bảo đảm chỉ có thay đổi phục vụ yêu cầu.
 2. Xác minh file chỉnh sửa vẫn là UTF-8.
 3. Chạy `npm run build`.
+
+## Quy tắc khi push code
+
+Khi người dùng yêu cầu **push code**, agent phải thực hiện đầy đủ các bước sau:
+
+1. Kiểm tra diff và chạy các kiểm tra phù hợp, tối thiểu là `npm run build` nếu có thay đổi mã nguồn.
+2. Tạo commit theo quy ước Conventional Commits nếu còn thay đổi chưa commit.
+3. Push commit lên remote/branch được yêu cầu.
+4. Sau khi push thành công, luôn cung cấp mô tả PR theo đúng format dưới đây, không cần người dùng yêu cầu lại.
+
+### Format mô tả PR bắt buộc
+
+```markdown
+## Tiêu đề PR
+
+`<type>(<scope>): <mô tả ngắn gọn>`
+
+## Nội dung PR
+
+### Mô tả
+
+<Mô tả ngắn gọn mục đích của thay đổi>
+
+### Thay đổi
+
+- <Thay đổi 1>
+- <Thay đổi 2>
+
+### Kiểm tra
+
+- <Các lệnh kiểm tra đã chạy và kết quả>
+```
+
+Tiêu đề và nội dung PR phải bám sát thay đổi thực tế; không bịa đặt các kiểm tra hoặc thay đổi chưa được thực hiện. Nếu không có `scope`, dùng format `<type>: <mô tả ngắn gọn>`.
