@@ -8,16 +8,27 @@ import HistoryPage from './components/HistoryPage.vue'
 import AppDialogs from './components/AppDialogs.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import DebtManager from './components/DebtManager.vue'
+import EventsPage from './components/EventsPage.vue'
 import ToastStack from './components/ToastStack.vue'
 import { addDays, dateKey, formatDate, isSameDay, browserTimeZone, monthKey, weekStartKey } from './utils/date'
 import { formatMoney, parseMoney, parseSignedMoney } from './utils/money'
-import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, updateDebtAccount, deleteDebtAccount, saveDebtPlan, deleteDebtPlan, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
+import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, updateDebtAccount, deleteDebtAccount, saveDebtPlan, deleteDebtPlan, fetchEvents, addEvent, deleteEvent, fetchEventEntries, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
 const tags = ref([])
 const debtAccounts = ref([])
 const debtEntries = ref([])
 const debtPlans = ref([])
+const events = ref([])
+const selectedEvent = ref(null)
+const eventName = ref('')
+const eventStart = ref('')
+const eventEnd = ref('')
+const eventNote = ref('')
+const eventAmount = ref('')
+const eventEntryNote = ref('')
+const eventEntryDate = ref('')
+const eventDirection = ref(-1)
 const session = ref(null)
 const authLoading = ref(true)
 const localAuthError = ref('')
@@ -41,6 +52,8 @@ const loading = ref(true)
 const error = ref('')
 const activeView = ref('today')
 const historyPeriod = ref('month')
+const historyMode = ref('calendar')
+const calendarAnchorKey = ref('')
 const searchQuery = ref('')
 const dateSearchMode = ref('day')
 const dateFrom = ref('')
@@ -100,6 +113,7 @@ function setActionLoading(key, value) {
 onMounted(async () => {
   document.addEventListener('keydown', handleKeydown)
   document.addEventListener('pointerdown', handleOutsidePointerDown)
+  calendarAnchorKey.value = utcDateKey(new Date())
   try {
     balancesHidden.value = localStorage.getItem('dmoney-balances-hidden') === 'true'
     const savedAppearance = localStorage.getItem('dmoney-appearance')
@@ -136,6 +150,7 @@ onMounted(async () => {
       debtAccounts.value = []
       debtEntries.value = []
       debtPlans.value = []
+      events.value = []
       loading.value = false
       error.value = ''
     }
@@ -160,13 +175,14 @@ async function load() {
   const version = ++loadVersion
   loading.value = true
   try {
-    const [loadedEntries, loadedTags, loadedDebtData] = await Promise.all([fetchEntries(), fetchTags(), fetchDebtData()])
+    const [loadedEntries, loadedTags, loadedDebtData, loadedEvents] = await Promise.all([fetchEntries(), fetchTags(), fetchDebtData(), fetchEvents()])
     if (version !== loadVersion) return
     entries.value = loadedEntries
     tags.value = loadedTags
     debtAccounts.value = loadedDebtData.accounts
     debtEntries.value = loadedDebtData.entries
     debtPlans.value = loadedDebtData.plans
+    events.value = await Promise.all(loadedEvents.map(async (event) => ({ ...event, entries: await fetchEventEntries(event.id) })))
     await seedDefaultTags()
   } catch (e) {
     notifyError('Không tải được sổ. Kiểm tra kết nối Supabase.')
@@ -421,6 +437,56 @@ const chartBuckets = computed(() => {
 const chartMax = computed(() => Math.max(1, ...chartBuckets.value.flatMap((bucket) => [bucket.income, bucket.expense])))
 const chartIncomeTotal = computed(() => chartBuckets.value.reduce((sum, bucket) => sum + bucket.income, 0))
 const chartExpenseTotal = computed(() => chartBuckets.value.reduce((sum, bucket) => sum + bucket.expense, 0))
+
+const calendarCells = computed(() => {
+  const now = new Date(`${calendarAnchorKey.value || utcDateKey(new Date())}T12:00:00Z`)
+  let keys = []
+  if (historyPeriod.value === 'day') {
+    const currentMonth = monthKey(now, dayResetTimeZone.value)
+    const [year, month] = currentMonth.split('-').map(Number)
+    const days = new Date(Date.UTC(year, month, 0)).getUTCDate()
+    keys = Array.from({ length: days }, (_, index) => `${currentMonth}-${String(index + 1).padStart(2, '0')}`)
+  } else if (historyPeriod.value === 'week') {
+    const start = weekStartKey(now, dayResetTimeZone.value)
+    keys = Array.from({ length: 7 }, (_, index) => addDays(start, index))
+  } else {
+    const year = Number(utcDateKey(now).slice(0, 4))
+    keys = Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, '0')}`)
+  }
+  return keys.map((key) => {
+    const rows = withBalance.value.filter((row) => {
+      const rowKey = utcDateKey(row.created_at)
+      return historyPeriod.value === 'month' ? rowKey.startsWith(key) : rowKey === key
+    }).filter((row) => matchesDateSearch(row) && (!searchQuery.value || filteredRows.value.some((item) => item.id === row.id)))
+    const income = rows.filter((row) => isCountedTowardDaily(row) && Number(row.amount) > 0).reduce((sum, row) => sum + Number(row.amount), 0)
+    const expense = rows.filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0).reduce((sum, row) => sum + Math.abs(Number(row.amount)), 0)
+    const [year, month, day] = key.split('-').map(Number)
+    const label = historyPeriod.value === 'month' ? new Intl.DateTimeFormat('vi-VN', { month: 'long' }).format(new Date(Date.UTC(year, month - 1, 1))) : (historyPeriod.value === 'week' ? formatWeekday(key) : String(day))
+    const firstDay = historyPeriod.value === 'day'
+      ? (new Date(Date.UTC(year, month - 1, 1)).getUTCDay() + 6) % 7
+      : 0
+    return { key, label, dayNumber: historyPeriod.value === 'day' ? day : null, rows, income, expense, net: income - expense, isToday: key === utcDateKey(now), firstDay }
+  })
+})
+const calendarWeekdays = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN']
+const calendarTitle = computed(() => {
+  const anchor = new Date(`${calendarAnchorKey.value || utcDateKey(new Date())}T12:00:00Z`)
+  if (historyPeriod.value === 'month') return String(anchor.getUTCFullYear())
+  if (historyPeriod.value === 'week') {
+    const start = weekStartKey(anchor, dayResetTimeZone.value)
+    return `${formatDayLabel(start)} – ${formatDayLabel(addDays(start, 6))}`
+  }
+  return new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric', timeZone: 'UTC' }).format(new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), 1)))
+})
+const calendarCanNext = computed(() => calendarAnchorKey.value < utcDateKey(new Date()))
+function moveCalendar(direction) {
+  const anchor = new Date(`${calendarAnchorKey.value || utcDateKey(new Date())}T12:00:00Z`)
+  if (historyPeriod.value === 'month') anchor.setUTCFullYear(anchor.getUTCFullYear() + direction)
+  else if (historyPeriod.value === 'week') calendarAnchorKey.value = addDays(calendarAnchorKey.value, direction * 7)
+  else anchor.setUTCMonth(anchor.getUTCMonth() + direction)
+  if (historyPeriod.value !== 'week') calendarAnchorKey.value = `${anchor.getUTCFullYear()}-${String(anchor.getUTCMonth() + 1).padStart(2, '0')}-01`
+  if (calendarAnchorKey.value > utcDateKey(new Date())) calendarAnchorKey.value = utcDateKey(new Date())
+}
 
 const totalPages = computed(() => Math.max(1, Math.ceil(historyRows.value.length / pageSize)))
 const paginatedRows = computed(() => {
@@ -801,6 +867,32 @@ function openEntryDetail(row) {
   selectedEntryDetail.value = row
 }
 
+async function createEvent() {
+  if (!eventName.value.trim() || !eventStart.value || !eventEnd.value || eventEnd.value < eventStart.value) return notifyError('Kiểm tra tên và khoảng thời gian sự kiện')
+  try {
+    const created = await addEvent(eventName.value.trim(), eventStart.value, eventEnd.value, eventNote.value.trim() || null)
+    events.value = [{ ...created, entries: [] }, ...events.value]
+    eventName.value = ''; eventStart.value = ''; eventEnd.value = ''; eventNote.value = ''
+  } catch (e) { notifyError('Không thể tạo sự kiện. Thử lại.') }
+}
+
+async function addEventEntry() {
+  const amount = parseMoney(eventAmount.value.trim(), moneyUnit.value)
+  if (!amount || !selectedEvent.value || !eventEntryDate.value) return notifyError('Nhập số tiền và ngày giao dịch hợp lệ')
+  if (eventEntryDate.value < selectedEvent.value.start_date || eventEntryDate.value > selectedEvent.value.end_date) return notifyError('Ngày giao dịch phải nằm trong thời gian sự kiện')
+  try {
+    const created = await addEntry(amount * eventDirection.value, eventEntryNote.value.trim() || null, 'cash', null, 'transaction', false, selectedEvent.value.id, `${eventEntryDate.value}T12:00:00.000Z`)
+    events.value = events.value.map((event) => event.id === selectedEvent.value.id ? { ...event, entries: [created, ...(event.entries || [])] } : event)
+    entries.value = [created, ...entries.value]
+    eventAmount.value = ''; eventEntryNote.value = ''; eventDirection.value = -1
+  } catch (e) { notifyError('Không thể lưu giao dịch sự kiện. Thử lại.') }
+}
+
+async function removeEvent(event) {
+  if (!window.confirm(`Xoá sự kiện “${event.name}” và các giao dịch bên trong?`)) return
+  try { await deleteEvent(event.id); events.value = events.value.filter((item) => item.id !== event.id); if (selectedEvent.value?.id === event.id) selectedEvent.value = null; await load() } catch (e) { notifyError('Không thể xoá sự kiện.') }
+}
+
 function requestRemoveDetail() {
   if (!selectedEntryDetail.value) return
   const entry = selectedEntryDetail.value
@@ -945,6 +1037,9 @@ const detailVisibleRange = computed(() => {
           <button type="button" :class="{ active: activeView === 'history' }" @click="activeView = 'history'">
             Lịch sử
           </button>
+          <button type="button" :class="{ active: activeView === 'events' }" @click="activeView = 'events'">
+            Sự kiện
+          </button>
         </nav>
 
         <div class="ledger" v-if="!loading">
@@ -969,7 +1064,7 @@ const detailVisibleRange = computed(() => {
 
 
           <HistoryPage
-            v-else
+            v-else-if="activeView === 'history'"
             v-model:history-period="historyPeriod"
             v-model:search-query="searchQuery"
             v-model:date-search-mode="dateSearchMode"
@@ -988,8 +1083,33 @@ const detailVisibleRange = computed(() => {
             :daily-summary-range="dailySummaryRange"
             :page-size="pageSize"
             :format-amount="fmt"
+            :history-mode="historyMode"
+            :calendar-cells="calendarCells"
+            :calendar-weekdays="calendarWeekdays"
+            :calendar-title="calendarTitle"
+            :calendar-can-next="calendarCanNext"
             @reset-date-search="resetDateSearch"
             @open-details="openDetails"
+            @update:history-mode="historyMode = $event"
+            @move-calendar="moveCalendar"
+          />
+
+          <EventsPage
+            v-else
+            v-model:selected-event="selectedEvent"
+            v-model:event-name="eventName"
+            v-model:event-start="eventStart"
+            v-model:event-end="eventEnd"
+            v-model:event-note="eventNote"
+            v-model:event-amount="eventAmount"
+            v-model:event-entry-note="eventEntryNote"
+            v-model:event-entry-date="eventEntryDate"
+            v-model:event-direction="eventDirection"
+            :events="events"
+            :format-amount="fmt"
+            @create-event="createEvent"
+            @add-event-entry="addEventEntry"
+            @delete-event="removeEvent"
           />
 
         </div>
