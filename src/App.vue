@@ -9,9 +9,11 @@ import AppDialogs from './components/AppDialogs.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import DebtManager from './components/DebtManager.vue'
 import EventsPage from './components/EventsPage.vue'
+import MonthlyReport from './components/MonthlyReport.vue'
 import ToastStack from './components/ToastStack.vue'
 import { addDays, dateKey, formatDate, isSameDay, browserTimeZone, monthKey, weekStartKey } from './utils/date'
 import { formatMoney, parseMoney, parseSignedMoney } from './utils/money'
+import { buildMonthlyReport } from './utils/report'
 import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, updateDebtAccount, deleteDebtAccount, saveDebtPlan, deleteDebtPlan, fetchEvents, addEvent, deleteEvent, fetchEventEntries, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
@@ -51,6 +53,7 @@ const savingBalance = ref(false)
 const loading = ref(true)
 const error = ref('')
 const activeView = ref('today')
+const reportMonth = ref(monthKey(new Date(), browserTimeZone()))
 const historyPeriod = ref('month')
 const historyMode = ref('calendar')
 const calendarAnchorKey = ref('')
@@ -342,6 +345,13 @@ const dailyIncome = computed(() => todayRows.value
 const dailyExpense = computed(() => todayRows.value
   .filter((row) => isCountedTowardDaily(row) && Number(row.amount) < 0)
   .reduce((total, row) => total + Math.abs(Number(row.amount)), 0))
+const monthlyReport = computed(() => buildMonthlyReport(withBalance.value, reportMonth.value, utcDateKey, isCountedTowardDaily))
+const reportMonthLabel = computed(() => {
+  const [year, month] = reportMonth.value.split('-').map(Number)
+  return new Intl.DateTimeFormat('vi-VN', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    .format(new Date(Date.UTC(year, month - 1, 1)))
+})
+const reportCanMoveNext = computed(() => reportMonth.value < monthKey(new Date(), dayResetTimeZone.value))
 const currentDebtMonth = computed(() => `${monthKey(new Date(), dayResetTimeZone.value)}-01`)
 const debts = computed(() => {
   const entriesByDebt = new Map()
@@ -486,6 +496,13 @@ function moveCalendar(direction) {
   else anchor.setUTCMonth(anchor.getUTCMonth() + direction)
   if (historyPeriod.value !== 'week') calendarAnchorKey.value = `${anchor.getUTCFullYear()}-${String(anchor.getUTCMonth() + 1).padStart(2, '0')}-01`
   if (calendarAnchorKey.value > utcDateKey(new Date())) calendarAnchorKey.value = utcDateKey(new Date())
+}
+
+function moveReportMonth(direction) {
+  const [year, month] = reportMonth.value.split('-').map(Number)
+  const next = new Date(Date.UTC(year, month - 1 + direction, 1))
+  const nextMonth = `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}`
+  if (nextMonth <= monthKey(new Date(), dayResetTimeZone.value)) reportMonth.value = nextMonth
 }
 
 const totalPages = computed(() => Math.max(1, Math.ceil(historyRows.value.length / pageSize)))
@@ -1037,6 +1054,9 @@ const detailVisibleRange = computed(() => {
           <button type="button" :class="{ active: activeView === 'history' }" @click="activeView = 'history'">
             Lịch sử
           </button>
+          <button type="button" :class="{ active: activeView === 'report' }" @click="activeView = 'report'">
+            Báo cáo
+          </button>
           <button type="button" :class="{ active: activeView === 'events' }" @click="activeView = 'events'">
             Sự kiện
           </button>
@@ -1092,6 +1112,15 @@ const detailVisibleRange = computed(() => {
             @open-details="openDetails"
             @update:history-mode="historyMode = $event"
             @move-calendar="moveCalendar"
+          />
+
+          <MonthlyReport
+            v-else-if="activeView === 'report'"
+            :month-label="reportMonthLabel"
+            :can-move-next="reportCanMoveNext"
+            :report="monthlyReport"
+            :format-amount="fmt"
+            @move-month="moveReportMonth"
           />
 
           <EventsPage
