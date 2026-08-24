@@ -1048,18 +1048,18 @@ const detailVisibleRange = computed(() => {
         <p v-if="error" class="error">{{ error }}</p>
 
         <nav class="view-tabs" aria-label="Chuyển màn hình">
-          <button type="button" :class="{ active: activeView === 'today' }" @click="activeView = 'today'">
-            Hôm nay
-          </button>
-          <button type="button" :class="{ active: activeView === 'history' }" @click="activeView = 'history'">
-            Lịch sử
-          </button>
-          <button type="button" :class="{ active: activeView === 'report' }" @click="activeView = 'report'">
-            Báo cáo
+          <button type="button" :class="{ active: activeView !== 'events' }" @click="activeView = 'today'">
+            Sổ cái
           </button>
           <button type="button" :class="{ active: activeView === 'events' }" @click="activeView = 'events'">
             Sự kiện
           </button>
+        </nav>
+
+        <nav v-if="activeView !== 'events'" class="ledger-subtabs" aria-label="Chế độ sổ cái">
+          <button type="button" :class="{ active: activeView === 'today' }" @click="activeView = 'today'">Hôm nay</button>
+          <button type="button" :class="{ active: activeView === 'history' }" @click="activeView = 'history'">Lịch sử</button>
+          <button type="button" :class="{ active: activeView === 'report' }" @click="activeView = 'report'">Báo cáo</button>
         </nav>
 
         <div class="ledger" v-if="!loading">
