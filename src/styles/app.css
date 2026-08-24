@@ -751,6 +751,28 @@
   color: var(--ink);
   font-weight: 600;
 }
+.ledger-subtabs {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+  font-family: 'Inter', sans-serif;
+}
+.ledger-subtabs button {
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-faint);
+  font: 11px 'Inter', sans-serif;
+  cursor: pointer;
+}
+.ledger-subtabs button:hover,
+.ledger-subtabs button.active {
+  border-color: var(--rule-strong);
+  background: rgba(156, 122, 60, 0.1);
+  color: var(--ink);
+  font-weight: 600;
+}
 .history-filters {
   margin-bottom: 12px;
 }
