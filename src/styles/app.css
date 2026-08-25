@@ -718,6 +718,35 @@
   padding: 24px 0;
 }
 
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: 7px;
+  margin: 18px 0;
+  padding: 30px 18px;
+  border: 1px dashed var(--rule-strong);
+  border-radius: 10px;
+  background: var(--paper-card);
+  color: var(--ink-faint);
+  text-align: center;
+}
+.empty-state.compact { margin: 12px 0; padding: 22px 16px; }
+.empty-state-icon { color: var(--brass); font-size: 25px; line-height: 1; }
+.empty-state strong { color: var(--ink); font: 600 15px 'Newsreader', serif; }
+.empty-state p { max-width: 360px; margin: 0; font: 12px/1.5 'Inter', sans-serif; }
+
 .ledger {
   margin-top: 18px;
 }
@@ -746,6 +775,7 @@
   padding: 8px 10px;
   border-bottom: 2px solid transparent;
 }
+.view-tabs button { flex: 1; min-height: 40px; }
 .view-tabs button.active {
   border-color: var(--brass);
   color: var(--ink);
@@ -756,6 +786,14 @@
   gap: 5px;
   margin-top: 10px;
   font-family: 'Inter', sans-serif;
+}
+.debt-card-heading {
+  grid-column: 1 / -1;
+  margin: 10px 12px 0;
+  color: var(--ink-faint);
+  font: 600 10px 'Inter', sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 .ledger-subtabs button {
   padding: 5px 9px;
@@ -772,6 +810,15 @@
   background: rgba(156, 122, 60, 0.1);
   color: var(--ink);
   font-weight: 600;
+}
+.view-tabs button:focus-visible,
+.ledger-subtabs button:focus-visible,
+.history-filters button:focus-visible,
+.history-mode-tabs button:focus-visible,
+.calendar-cell:focus-visible,
+.day-summary-row:focus-visible {
+  outline: 3px solid rgba(156, 122, 60, .35);
+  outline-offset: 2px;
 }
 .history-filters {
   margin-bottom: 12px;
