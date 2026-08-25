@@ -47,6 +47,9 @@
 .appearance-modern .view-tabs { grid-column: 2; margin: 0; padding: 4px; border: 0; border-radius: 12px; background: #e2e8f0; }
 .appearance-modern .view-tabs button { border: 0; border-radius: 8px; font-family: var(--font-ui); }
 .appearance-modern .view-tabs button.active { border: 0; background: #fff; color: #1d4ed8; box-shadow: 0 2px 5px rgba(15, 23, 42, .08); }
+.appearance-modern .ledger-subtabs { grid-column: 2; margin: 0; padding: 4px; border-radius: 12px; background: #eef2f7; }
+.appearance-modern .ledger-subtabs button { flex: 1; border: 0; border-radius: 8px; color: #64748b; font-family: var(--font-ui); }
+.appearance-modern .ledger-subtabs button.active { background: #fff; color: #1d4ed8; box-shadow: 0 2px 5px rgba(15, 23, 42, .08); }
 .appearance-modern .ledger { grid-column: 2; padding: 22px; border: 1px solid #dbe3ef; border-radius: 18px; background: #fff; }
 .appearance-modern .daily-balance { padding: 15px; border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #475569; font-family: var(--font-ui); }
 .appearance-modern .daily-balance strong { font-family: var(--font-number); }
@@ -83,7 +86,8 @@
   .appearance-modern .debt-total-button + .debt-total-button { margin: 0; border-left: 1px solid #e2e8f0; }
   .appearance-modern .debt-add-btn { width: auto; min-width: 0; grid-column: 1 / -1; margin: 0 10px 10px; }
   .appearance-modern .entry-form { order: 2; margin: 16px; padding: 16px; border-radius: 14px; }
-  .appearance-modern .view-tabs { order: 3; position: fixed; z-index: 4; right: 12px; bottom: 12px; left: 12px; margin: 0; padding: 6px; border-radius: 14px; background: rgba(226, 232, 240, .96); box-shadow: 0 12px 28px rgba(15, 23, 42, .22); }
+  .appearance-modern .ledger-subtabs { order: 3; grid-column: auto; margin: 0 16px; padding: 4px; border-radius: 12px; }
+  .appearance-modern .view-tabs { order: 5; position: fixed; z-index: 4; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); left: 12px; margin: 0; padding: 6px; border-radius: 14px; background: rgba(226, 232, 240, .96); box-shadow: 0 12px 28px rgba(15, 23, 42, .22); }
   .appearance-modern .view-tabs button { flex: 1; padding: 11px; }
   .appearance-modern .ledger { order: 4; margin: 0 16px; padding: 16px; border: 0; border-radius: 14px; background: transparent; }
   .appearance-modern .daily-balance { padding: 13px; }
