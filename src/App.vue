@@ -14,6 +14,7 @@ import ToastStack from './components/ToastStack.vue'
 import { addDays, dateKey, formatDate, isSameDay, browserTimeZone, monthKey, weekStartKey } from './utils/date'
 import { formatMoney, parseMoney, parseSignedMoney } from './utils/money'
 import { buildMonthlyReport } from './utils/report'
+import { calculateBalances, searchEntries } from './utils/ledger'
 import { fetchEntries, addEntry, deleteEntry, fetchTags, addTags, updateTag, deleteTag, fetchDebtData, createDebtAccount, addDebtIncrease, payDebt, updateDebtAccount, deleteDebtAccount, saveDebtPlan, deleteDebtPlan, fetchEvents, addEvent, deleteEvent, fetchEventEntries, signInAnonymously, signOut, getSession, onAuthStateChange } from './supabase'
 
 const entries = ref([])
@@ -210,30 +211,7 @@ async function handleSignOut() {
 }
 
 // Số dư được tính luỹ kế trên toàn bộ sổ, từ giao dịch cũ nhất đến mới nhất.
-const withBalance = computed(() => {
-  const chrono = [...entries.value].sort((a, b) => {
-    const timeDiff = new Date(a.created_at) - new Date(b.created_at)
-    return timeDiff || a.id.localeCompare(b.id)
-  })
-  let running = 0
-  const runningByAccount = { cash: 0, bank: 0, wallet: 0 }
-  const rows = chrono.map((e) => {
-    const amount = Number(e.amount)
-    const accountType = e.account_type || 'cash'
-    const isAdjustment = e.entry_type === 'adjustment'
-    if (!isAdjustment) {
-      running += amount
-      runningByAccount[accountType] += amount
-    }
-    return {
-      ...e,
-      account_type: accountType,
-      balance: running,
-      accountBalance: runningByAccount[accountType]
-    }
-  })
-  return rows.reverse()
-})
+const withBalance = computed(() => calculateBalances(entries.value))
 
 const currentBalance = computed(() => entries.value.reduce((total, entry) => total + Number(entry.amount), 0))
 const balancesByAccount = computed(() => entries.value.reduce((balances, entry) => {
@@ -302,29 +280,7 @@ function normalizeSearch(value) {
 }
 
 const filteredRows = computed(() => {
-  const query = normalizeSearch(searchQuery.value)
-  if (!query) return withBalance.value
-
-  const compactQuery = query.replace(/[.,\s]/g, '')
-  return withBalance.value.filter((row) => {
-    const noteMatches = normalizeSearch(row.note).includes(query)
-    const tagMatches = normalizeSearch(row.tag).includes(query)
-    const accountMatches = normalizeSearch(accountLabel(row.account_type)).includes(query)
-    const amount = Number(row.amount)
-    const amountValues = [
-      String(row.amount),
-      String(amount),
-      String(Math.abs(amount)),
-      fmt(amount),
-      fmt(Math.abs(amount))
-    ]
-    const amountMatches = amountValues.some((value) => {
-      const normalizedValue = normalizeSearch(value)
-      return normalizedValue.includes(query)
-        || normalizedValue.replace(/[.,\s]/g, '').includes(compactQuery)
-    })
-    return noteMatches || tagMatches || accountMatches || amountMatches
-  })
+  return searchEntries(withBalance.value, searchQuery.value, { formatAmount: fmt, accountLabel })
 })
 
 function matchesDateSearch(row) {
