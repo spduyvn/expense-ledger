@@ -11,12 +11,12 @@ defineEmits(['update:selected-event', 'update:event-name', 'update:event-start',
   <section class="events-page">
     <div class="section-heading"><div><p class="eyebrow">Kho lưu trữ</p><h2>Sự kiện</h2></div><span class="section-count">{{ events.length }} sự kiện</span></div>
     <form class="event-create-form" @submit.prevent="$emit('create-event')">
-      <input :value="eventName" required placeholder="Tên sự kiện (ví dụ: Du lịch)" @input="$emit('update:event-name', $event.target.value)" />
+      <label class="sr-only" for="event-name">Tên sự kiện</label><input id="event-name" :value="eventName" required placeholder="Tên sự kiện (ví dụ: Du lịch)" @input="$emit('update:event-name', $event.target.value)" />
       <div class="event-dates"><label>Từ <input :value="eventStart" type="date" required @input="$emit('update:event-start', $event.target.value)" /></label><label>Đến <input :value="eventEnd" type="date" required @input="$emit('update:event-end', $event.target.value)" /></label></div>
-      <input :value="eventNote" placeholder="Ghi chú sự kiện (tuỳ chọn)" @input="$emit('update:event-note', $event.target.value)" />
+      <label class="sr-only" for="event-note">Ghi chú sự kiện</label><input id="event-note" :value="eventNote" placeholder="Ghi chú sự kiện (tuỳ chọn)" @input="$emit('update:event-note', $event.target.value)" />
       <button class="add-btn" type="submit">Tạo sự kiện</button>
     </form>
-    <div v-if="!events.length" class="empty">Chưa có sự kiện nào.</div>
+    <div v-if="!events.length" class="empty-state compact"><span class="empty-state-icon" aria-hidden="true">◌</span><strong>Chưa có sự kiện nào</strong><p>Tạo một sự kiện để gom các khoản chi cho chuyến đi, dự án hoặc dịp đặc biệt.</p></div>
     <div v-for="event in events" :key="event.id" class="event-card" :class="{ active: selectedEvent?.id === event.id }">
       <button class="event-card-header" type="button" @click="$emit('update:selected-event', selectedEvent?.id === event.id ? null : event)"><span><strong>{{ event.name }}</strong><small>{{ event.start_date }} — {{ event.end_date }}</small></span><span>›</span></button>
       <p v-if="event.note" class="event-note">{{ event.note }}</p>

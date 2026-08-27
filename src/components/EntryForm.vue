@@ -17,7 +17,8 @@ defineEmits(['update:input', 'update:note', 'update:selected-account-type', 'upd
 <template>
   <form class="entry-form" @submit.prevent="$emit('submit')">
     <div class="amount-row">
-      <input :value="input" class="amount-input" :class="entryDirection === -1 ? 'expense-input' : 'income-input'" type="text" inputmode="decimal" placeholder="Số tiền" aria-label="Số tiền" @input="$emit('update:input', $event.target.value)" />
+      <label class="sr-only" for="entry-amount">Số tiền giao dịch</label>
+      <input id="entry-amount" :value="input" class="amount-input" :class="entryDirection === -1 ? 'expense-input' : 'income-input'" type="text" inputmode="decimal" placeholder="Số tiền (ví dụ 50k)" @input="$emit('update:input', $event.target.value)" />
       <div class="entry-direction" aria-label="Loại giao dịch">
         <button type="button" :class="{ active: entryDirection === -1 }" @click="$emit('update:entry-direction', -1)">− Chi</button>
         <button type="button" :class="{ active: entryDirection === 1 }" @click="$emit('update:entry-direction', 1)">+ Thu</button>
@@ -27,7 +28,8 @@ defineEmits(['update:input', 'update:note', 'update:selected-account-type', 'upd
       <button v-for="account in accountTypes" :key="account.value" type="button" :class="{ active: selectedAccountType === account.value }" @click="$emit('update:selected-account-type', account.value)">{{ account.label }}</button>
     </div>
     <div class="note-daily-row">
-      <input :value="note" class="note-input" type="text" placeholder="Note (tuỳ chọn)" aria-label="Ghi chú" @input="$emit('update:note', $event.target.value)" />
+        <label class="sr-only" for="entry-note">Ghi chú giao dịch</label>
+        <input id="entry-note" :value="note" class="note-input" type="text" placeholder="Ghi chú (tuỳ chọn)" @input="$emit('update:note', $event.target.value)" />
       <div class="daily-toggle-control">
         <label class="daily-toggle"><span class="daily-toggle-text">Tính thu nhập ngày</span><input :checked="countsTowardDaily" type="checkbox" role="switch" aria-label="Tính giao dịch vào thu nhập ngày" @change="$emit('update:counts-toward-daily', $event.target.checked)" /><span class="toggle-track" aria-hidden="true"><span></span></span></label>
       </div>

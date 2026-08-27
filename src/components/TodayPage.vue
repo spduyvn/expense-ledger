@@ -11,7 +11,7 @@ defineEmits(['update:page', 'open-entry-detail'])
 <template>
   <section class="today-page">
     <div class="daily-balance"><span>Thu nhập ngày</span><span class="daily-balance-values"><strong :class="dailyBalance < 0 ? 'neg' : 'pos'">{{ dailyBalance < 0 ? '' : '+' }}{{ formatAmount(dailyBalance) }}</strong><span class="daily-breakdown"><small class="pos">Thu {{ formatAmount(dailyIncome) }}</small><span aria-hidden="true">·</span><small class="neg">Chi {{ formatAmount(dailyExpense) }}</small></span></span></div>
-    <div v-if="!todayRows.length" class="empty">Hôm nay chưa có giao dịch nào.</div>
+    <div v-if="!todayRows.length" class="empty-state"><span class="empty-state-icon" aria-hidden="true">＋</span><strong>Hôm nay chưa có giao dịch</strong><p>Nhập số tiền ở phía trên rồi chọn <b>Ghi sổ</b> để thêm giao dịch đầu tiên.</p></div>
     <div v-else class="day-group">
       <div class="day-label"><span>Giao dịch hôm nay</span><span class="rule"></span></div>
       <button v-for="row in paginatedRows" :key="row.id" type="button" class="row" :disabled="deletingEntryId === row.id" :aria-label="`Xem chi tiết giao dịch, ${formatAmount(row.amount)}`" @click="$emit('open-entry-detail', row)">
