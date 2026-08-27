@@ -50,6 +50,7 @@ defineEmits(['open-settings', 'toggle-balances', 'start-balance-edit', 'open-deb
         </div>
       </div>
       <section class="debt-card" aria-label="Theo dõi nợ">
+        <p class="debt-card-heading">Theo dõi nghĩa vụ</p>
         <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Cần trả tháng này: số tiền đang được ẩn' : `Cần trả tháng này: ${formatAmount(currentMonthDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Cần trả tháng này</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(currentMonthDebt) }} <small>₫</small></strong></button>
         <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Tổng nợ: số tiền đang được ẩn' : `Tổng nợ: ${formatAmount(currentDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Tổng nợ</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(currentDebt) }} <small>₫</small></strong></button>
         <button type="button" class="debt-add-btn debt-open-btn" @click="$emit('open-debt-manager')">Quản lý khoản nợ</button>
