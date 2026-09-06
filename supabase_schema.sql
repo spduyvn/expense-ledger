@@ -296,6 +296,17 @@ update entries
 set counts_toward_daily = true
 where id in (select ledger_entry_id from debt_entries where ledger_entry_id is not null);
 
+update entries
+set tag = 'Trả nợ'
+where id in (
+  select debt_entries.ledger_entry_id
+  from debt_entries
+  join debt_accounts on debt_accounts.id = debt_entries.debt_id
+  where debt_entries.entry_type = 'payment'
+    and debt_accounts.debt_type <> 'lent'
+    and debt_entries.ledger_entry_id is not null
+);
+
 create or replace function add_debt_increase(
   p_debt_id uuid,
   p_amount numeric,
@@ -353,11 +364,12 @@ begin
     raise exception 'Nguồn tiền không hợp lệ';
   end if;
 
-  insert into entries (amount, note, account_type, entry_type, counts_toward_daily)
+  insert into entries (amount, note, account_type, tag, entry_type, counts_toward_daily)
   values (
     case when v_debt_type = 'lent' then p_amount else -p_amount end,
     coalesce(p_note, case when v_debt_type = 'lent' then 'Thu hồi khoản vay: ' else 'Trả nợ: ' end || v_name),
     p_account_type,
+    case when v_debt_type = 'lent' then null else 'Trả nợ' end,
     'transaction',
     true
   )
