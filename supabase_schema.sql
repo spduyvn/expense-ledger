@@ -274,7 +274,7 @@ begin
   values (trim(p_name), p_note, p_debt_type, p_due_date) returning id into v_debt_id;
   if p_debt_type = 'lent' then
     insert into entries (amount, note, account_type, entry_type, counts_toward_daily)
-    values (-p_opening_amount, coalesce(p_note, 'Cho vay: ' || trim(p_name)), 'bank', 'transaction', false)
+    values (-p_opening_amount, coalesce(p_note, 'Cho vay: ' || trim(p_name)), 'bank', 'transaction', true)
     returning id into v_ledger_entry_id;
   end if;
   insert into debt_entries (debt_id, amount, entry_type, note, ledger_entry_id)
@@ -289,6 +289,12 @@ begin
   return v_debt_id;
 end;
 $$;
+
+-- Debt-linked ledger movements are actual income/expense and must appear in
+-- daily and monthly summaries, including records created before this rule.
+update entries
+set counts_toward_daily = true
+where id in (select ledger_entry_id from debt_entries where ledger_entry_id is not null);
 
 create or replace function add_debt_increase(
   p_debt_id uuid,
@@ -353,7 +359,7 @@ begin
     coalesce(p_note, case when v_debt_type = 'lent' then 'Thu hồi khoản vay: ' else 'Trả nợ: ' end || v_name),
     p_account_type,
     'transaction',
-    false
+    true
   )
   returning id into v_ledger_entry_id;
 
