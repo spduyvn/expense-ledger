@@ -806,8 +806,15 @@ function setMoneyUnit(value) {
 }
 
 function isCountedTowardDaily(entry) {
-  return entry.entry_type !== 'adjustment' && entry.counts_toward_daily !== false
+  if (entry.entry_type === 'adjustment') return false
+  if (entry.counts_toward_daily !== false) return true
+  // Debt-linked ledger entries are real income/expense and remain reportable.
+  return debtLedgerEntryIds.value.has(entry.id)
 }
+
+const debtLedgerEntryIds = computed(() => new Set(
+  debtEntries.value.map((entry) => entry.ledger_entry_id).filter(Boolean)
+))
 
 function accountLabel(accountType) {
   return accountTypes.find((account) => account.value === accountType)?.label || 'Tiền mặt'
