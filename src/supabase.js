@@ -74,10 +74,10 @@ export async function fetchEventEntries(eventId) {
   return data
 }
 
-export async function addEntry(amount, note, accountType, tag, entryType = 'transaction', countsTowardDaily = true, eventId = null, createdAt = null) {
+export async function addEntry(amount, note, accountType, tag, entryType = 'transaction', countsTowardDaily = true, eventId = null, createdAt = null, transferId = null) {
   const { data, error } = await supabase
     .from('entries')
-    .insert({ amount, note, account_type: accountType, tag, entry_type: entryType, counts_toward_daily: countsTowardDaily, event_id: eventId, ...(createdAt ? { created_at: createdAt } : {}) })
+    .insert({ amount, note, account_type: accountType, tag, entry_type: entryType, counts_toward_daily: countsTowardDaily, event_id: eventId, transfer_id: transferId, ...(createdAt ? { created_at: createdAt } : {}) })
     .select()
     .single()
   if (error) throw error
