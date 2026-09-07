@@ -46,7 +46,6 @@
 .appearance-midnight .amount-input:focus, .appearance-midnight .note-input:focus { border-color: #22d3ee; box-shadow: 0 0 0 3px rgba(34, 211, 238, .13); }
 .appearance-midnight .entry-direction button, .appearance-midnight .choice-group button { border-color: #314967; background: #14243b; color: #c4d8ea; font-family: var(--font-ui); }
 .appearance-midnight .entry-direction button.active, .appearance-midnight .choice-group button.active { border-color: #22d3ee; background: rgba(34, 211, 238, .14); color: #a5f3fc; }
-.appearance-midnight .entry-direction button:first-child.active { border-color: #fb7185; background: rgba(251, 113, 133, .12); color: #fecdd3; }
 .appearance-midnight .add-btn, .appearance-midnight .save-balance-btn { border-color: #22d3ee; border-radius: 7px; background: #0891b2; font-family: var(--font-ui); }
 .appearance-midnight .view-tabs { margin-top: 22px; border-bottom-color: #213650; }
 .appearance-midnight .view-tabs button { color: #94a9c2; font-family: var(--font-ui); }

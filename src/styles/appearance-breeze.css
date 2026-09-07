@@ -47,7 +47,6 @@
 .appearance-breeze .amount-input:focus, .appearance-breeze .note-input:focus { border-color: #0f766e; box-shadow: 0 0 0 3px rgba(13, 148, 136, .1); }
 .appearance-breeze .entry-direction button, .appearance-breeze .choice-group button { font-family: var(--font-ui); }
 .appearance-breeze .entry-direction button.active, .appearance-breeze .choice-group button.active { border-color: #0f766e; background: #e6fffb; color: #0f766e; }
-.appearance-breeze .entry-direction button:first-child.active { border-color: #e11d48; background: #fff1f2; color: #be123c; }
 .appearance-breeze .add-btn, .appearance-breeze .save-balance-btn { border-color: #0f766e; border-radius: 999px; background: #0f766e; font-family: var(--font-ui); }
 .appearance-breeze .view-tabs { justify-content: center; margin-top: 22px; border: 0; }
 .appearance-breeze .view-tabs button { border-radius: 999px; color: #5f7f7c; font-family: var(--font-ui); }

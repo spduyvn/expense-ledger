@@ -437,6 +437,7 @@
   flex: 0 0 auto;
   gap: 4px;
 }
+.entry-direction { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: min(100%, 390px); }
 .entry-direction button,
 .choice-group button {
   border: 1px solid var(--rule-strong);
@@ -467,16 +468,8 @@
   color: var(--ink);
   font-weight: 600;
 }
-.entry-direction button:first-child.active {
-  border-color: var(--red);
-  background: rgba(161, 45, 39, 0.1);
-  color: var(--red);
-}
-.entry-direction button:last-child.active {
-  border-color: var(--green);
-  background: rgba(23, 107, 69, 0.1);
-  color: var(--green);
-}
+.entry-direction button.active { border-color: var(--green); background: rgba(23, 107, 69, 0.1); color: var(--green); }
+.transfer-label { align-self: center; margin-right: 4px; color: var(--ink-faint); font-size: 11px; }
 .amount-row .amount-input.expense-input:focus {
   border-color: var(--red);
   color: var(--red);
@@ -1283,7 +1276,7 @@
   .settings-btn { padding: 7px 9px; }
   .amount-row,
   .note-daily-row { flex-direction: column; align-items: stretch; }
-  .entry-direction { display: grid; grid-template-columns: 1fr 1fr; }
+  .entry-direction { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
   .entry-direction button { min-height: 38px; }
   .daily-toggle-control { min-height: 38px; }
   .daily-toggle { justify-content: space-between; min-height: 38px; padding: 0 10px; }

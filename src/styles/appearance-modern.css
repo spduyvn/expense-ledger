@@ -41,7 +41,6 @@
 .appearance-modern .amount-input:focus, .appearance-modern .note-input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37, 99, 235, .12); }
 .appearance-modern .entry-direction button, .appearance-modern .choice-group button { font-family: var(--font-ui); }
 .appearance-modern .entry-direction button.active, .appearance-modern .choice-group button.active { border-color: #2563eb; background: #eff6ff; color: #1d4ed8; }
-.appearance-modern .entry-direction button:first-child.active { border-color: #dc2626; background: #fef2f2; color: #b91c1c; }
 .appearance-modern .add-btn, .appearance-modern .save-balance-btn { border-color: #2563eb; border-radius: 9px; background: #2563eb; font-family: var(--font-ui); }
 .appearance-modern .balance-form, .appearance-modern .error { grid-column: 2; }
 .appearance-modern .view-tabs { grid-column: 2; margin: 0; padding: 4px; border: 0; border-radius: 12px; background: #e2e8f0; }

@@ -22,12 +22,13 @@ defineEmits(['update:input', 'update:note', 'update:selected-account-type', 'upd
       <label class="sr-only" for="entry-amount">Số tiền giao dịch</label>
       <input id="entry-amount" :value="input" class="amount-input" :class="entryDirection === -1 ? 'expense-input' : 'income-input'" type="text" inputmode="decimal" placeholder="Số tiền (ví dụ 50k)" @input="$emit('update:input', $event.target.value)" />
       <div class="entry-direction" aria-label="Loại giao dịch">
-        <button type="button" :class="{ active: transferMode }" @click="$emit('update:transfer-mode', true)">↔ Chuyển</button>
         <button type="button" :class="{ active: !transferMode && entryDirection === -1 }" @click="$emit('update:transfer-mode', false); $emit('update:entry-direction', -1)">− Chi</button>
         <button type="button" :class="{ active: !transferMode && entryDirection === 1 }" @click="$emit('update:transfer-mode', false); $emit('update:entry-direction', 1)">+ Thu</button>
+        <button type="button" :class="{ active: transferMode }" @click="$emit('update:transfer-mode', true)">↔ Chuyển</button>
       </div>
     </div>
     <div class="choice-group account-choice" role="group" aria-label="Nguồn tiền">
+      <span v-if="transferMode" class="transfer-label">Từ</span>
       <button v-for="account in accountTypes" :key="account.value" type="button" :class="{ active: selectedAccountType === account.value }" @click="$emit('update:selected-account-type', account.value)">{{ account.label }}</button>
     </div>
     <div v-if="transferMode" class="choice-group account-choice" role="group" aria-label="Tài khoản nhận">
