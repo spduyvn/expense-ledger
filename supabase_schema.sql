@@ -8,7 +8,7 @@ create table if not exists entries (
     check (account_type in ('cash', 'bank', 'wallet')),
   tag text,
   entry_type text not null default 'transaction'
-    check (entry_type in ('transaction', 'adjustment')),
+    check (entry_type in ('transaction', 'adjustment', 'transfer')),
   counts_toward_daily boolean not null default true,
   user_id uuid not null default auth.uid() references auth.users(id),
   created_at timestamptz not null default now()
@@ -33,6 +33,7 @@ create policy "Users can select their own events" on events for select using (us
 create policy "Users can insert their own events" on events for insert with check (user_id = auth.uid());
 create policy "Users can delete their own events" on events for delete using (user_id = auth.uid());
 alter table entries add column if not exists event_id uuid references events(id) on delete cascade;
+alter table entries add column if not exists transfer_id uuid;
 
 -- Migration cho bảng entries đã tồn tại: giao dịch cũ được xem là tiền mặt.
 alter table entries add column if not exists account_type text;
@@ -76,12 +77,13 @@ end $$;
 
 do $$
 begin
+  alter table entries drop constraint if exists entries_entry_type_check;
   if not exists (
     select 1 from pg_constraint where conname = 'entries_entry_type_check'
   ) then
     alter table entries
       add constraint entries_entry_type_check
-      check (entry_type in ('transaction', 'adjustment'));
+      check (entry_type in ('transaction', 'adjustment', 'transfer'));
   end if;
 end $$;
 

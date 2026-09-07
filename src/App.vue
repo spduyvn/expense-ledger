@@ -45,6 +45,8 @@ const editingTagId = ref(null)
 const editingTagName = ref('')
 const entryDirection = ref(-1)
 const countsTowardDaily = ref(true)
+const transferMode = ref(false)
+const transferAccountType = ref(null)
 const balancesHidden = ref(false)
 const dailyInfoOpen = ref(false)
 const dailyInfoRef = ref(null)
@@ -517,23 +519,35 @@ async function submit() {
     notifyError('Chọn nguồn tiền trước khi ghi sổ')
     return
   }
+  if (transferMode.value && (!transferAccountType.value || transferAccountType.value === selectedAccountType.value)) {
+    notifyError('Chọn tài khoản nhận khác tài khoản nguồn')
+    return
+  }
   error.value = ''
   setActionLoading('entry', true)
   try {
-    const created = await addEntry(
-      amount * entryDirection.value,
-      note.value.trim() || null,
-      selectedAccountType.value,
-      selectedTag.value,
-      'transaction',
-      countsTowardDaily.value
-    )
-    entries.value = [created, ...entries.value]
+    if (transferMode.value) {
+      const transferId = crypto.randomUUID()
+      const transferNote = note.value.trim() || 'Chuyển tiền'
+      const source = await addEntry(-amount, `${transferNote} (đi)`, selectedAccountType.value, null, 'transfer', false, null, null, transferId)
+      try {
+        const destination = await addEntry(amount, `${transferNote} (đến)`, transferAccountType.value, null, 'transfer', false, null, null, transferId)
+        entries.value = [destination, source, ...entries.value]
+      } catch (destinationError) {
+        await deleteEntry(source.id).catch(() => {})
+        throw destinationError
+      }
+    } else {
+      const created = await addEntry(amount * entryDirection.value, note.value.trim() || null, selectedAccountType.value, selectedTag.value, 'transaction', countsTowardDaily.value)
+      entries.value = [created, ...entries.value]
+    }
     input.value = ''
     note.value = ''
     selectedTag.value = null
     entryDirection.value = -1
     countsTowardDaily.value = true
+    transferMode.value = false
+    transferAccountType.value = null
     currentPage.value = 1
     todayPage.value = 1
   } catch (e) {
@@ -783,6 +797,13 @@ async function confirmRemove() {
   entries.value = entries.value.filter((e) => e.id !== entry.id)
   try {
     await deleteEntry(entry.id)
+    if (entry.entry_type === 'transfer' && entry.transfer_id) {
+      const counterpart = entries.value.find((e) => e.transfer_id === entry.transfer_id)
+      if (counterpart) {
+        entries.value = entries.value.filter((e) => e.id !== counterpart.id)
+        await deleteEntry(counterpart.id)
+      }
+    }
   } catch (e) {
     notifyError('Không xoá được trên máy chủ.')
     pushToast(error.value)
@@ -806,7 +827,7 @@ function setMoneyUnit(value) {
 }
 
 function isCountedTowardDaily(entry) {
-  if (entry.entry_type === 'adjustment') return false
+  if (entry.entry_type === 'adjustment' || entry.entry_type === 'transfer') return false
   if (entry.counts_toward_daily !== false) return true
   // Debt-linked ledger entries are real income/expense and remain reportable.
   return debtLedgerEntryIds.value.has(entry.id)
@@ -984,6 +1005,8 @@ const detailVisibleRange = computed(() => {
           v-model:selected-tag="selectedTag"
           v-model:entry-direction="entryDirection"
           v-model:counts-toward-daily="countsTowardDaily"
+          v-model:transfer-mode="transferMode"
+          v-model:transfer-account-type="transferAccountType"
           :loading="actionLoading.entry"
           :money-unit="moneyUnit"
           :account-types="accountTypes"
