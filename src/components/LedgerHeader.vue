@@ -7,6 +7,7 @@ defineProps({
   balancesByAccount: { type: Object, required: true },
   balanceAccountTypes: { type: Array, required: true },
   currentMonthDebt: { type: Number, required: true },
+  nextMonthDebt: { type: Number, required: true },
   currentDebt: { type: Number, required: true },
   formatAmount: { type: Function, required: true }
 })
@@ -52,6 +53,7 @@ defineEmits(['open-settings', 'toggle-balances', 'start-balance-edit', 'open-deb
       <section class="debt-card" aria-label="Theo dõi nợ">
         <p class="debt-card-heading"></p>
         <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Cần trả tháng này: số tiền đang được ẩn' : `Cần trả tháng này: ${formatAmount(currentMonthDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Cần trả tháng này</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(currentMonthDebt) }} <small>₫</small></strong></button>
+        <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Cần trả tháng sau: số tiền đang được ẩn' : `Cần trả tháng sau: ${formatAmount(nextMonthDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Cần trả tháng sau</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(nextMonthDebt) }} <small>₫</small></strong></button>
         <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Tổng nợ: số tiền đang được ẩn' : `Tổng nợ: ${formatAmount(currentDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Tổng nợ</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(currentDebt) }} <small>₫</small></strong></button>
         <button type="button" class="debt-add-btn debt-open-btn" @click="$emit('open-debt-manager')">Quản lý khoản nợ</button>
       </section>
