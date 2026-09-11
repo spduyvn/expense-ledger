@@ -311,6 +311,10 @@ const reportMonthLabel = computed(() => {
 })
 const reportCanMoveNext = computed(() => reportMonth.value < monthKey(new Date(), dayResetTimeZone.value))
 const currentDebtMonth = computed(() => `${monthKey(new Date(), dayResetTimeZone.value)}-01`)
+const nextDebtMonth = computed(() => {
+  const [year, month] = currentDebtMonth.value.slice(0, 7).split('-').map(Number)
+  return `${month === 12 ? year + 1 : year}-${String(month === 12 ? 1 : month + 1).padStart(2, '0')}-01`
+})
 const debts = computed(() => {
   const entriesByDebt = new Map()
   const plansByDebt = new Map()
@@ -347,6 +351,9 @@ const debts = computed(() => {
 const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
 const currentDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.balance, 0))
 const currentMonthDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.monthRemaining, 0))
+const nextMonthDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.plans
+  .filter((plan) => plan.month === nextDebtMonth.value)
+  .reduce((subtotal, plan) => subtotal + plan.remaining, 0), 0))
 const todayTotalPages = computed(() => Math.max(1, Math.ceil(todayRows.value.length / pageSize)))
 const paginatedTodayRows = computed(() => {
   const start = (todayPage.value - 1) * pageSize
@@ -1004,6 +1011,7 @@ const detailVisibleRange = computed(() => {
           :balances-by-account="balancesByAccount"
           :balance-account-types="balanceAccountTypes"
           :current-month-debt="currentMonthDebt"
+          :next-month-debt="nextMonthDebt"
           :current-debt="currentDebt"
           :format-amount="fmt"
           @open-settings="settingsOpen = true"
