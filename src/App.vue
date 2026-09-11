@@ -326,9 +326,22 @@ const debts = computed(() => {
   const entries = entriesByDebt.get(account.id) || []
   const plans = plansByDebt.get(account.id) || []
   const balance = entries.reduce((total, entry) => total + Number(entry.amount), 0)
-  const monthPlanned = plans.filter((plan) => plan.month === currentDebtMonth.value).reduce((total, plan) => total + Number(plan.planned_amount), 0)
-  const monthPaid = entries.filter((entry) => entry.entry_type === 'payment' && String(entry.occurred_at).slice(0, 7) === currentDebtMonth.value.slice(0, 7)).reduce((total, entry) => total + Math.abs(Number(entry.amount)), 0)
-  return { ...account, entries, plans: plans.map((plan) => ({ month: plan.month, amount: Number(plan.planned_amount) })), balance, monthPlanned, monthPaid, monthRemaining: Math.max(0, monthPlanned - monthPaid) }
+  const paidByMonth = entries.filter((entry) => entry.entry_type === 'payment').reduce((result, entry) => {
+    const month = String(entry.occurred_at).slice(0, 7)
+    result[month] = (result[month] || 0) + Math.abs(Number(entry.amount))
+    return result
+  }, {})
+  const normalizedPlans = plans.map((plan) => {
+    const month = String(plan.month).slice(0, 7)
+    const amount = Number(plan.planned_amount)
+    const paid = paidByMonth[month] || 0
+    return { month: plan.month, amount, paid, remaining: Math.max(0, amount - paid) }
+  })
+  const monthPlanned = normalizedPlans.filter((plan) => plan.month === currentDebtMonth.value).reduce((total, plan) => total + plan.amount, 0)
+  const monthPaid = paidByMonth[currentDebtMonth.value.slice(0, 7)] || 0
+  const previousPaid = Object.entries(paidByMonth).filter(([month]) => month < currentDebtMonth.value.slice(0, 7)).reduce((total, [, paid]) => total + paid, 0)
+  const upcomingDue = normalizedPlans.filter((plan) => plan.month > currentDebtMonth.value).reduce((total, plan) => total + plan.remaining, 0)
+  return { ...account, entries, plans: normalizedPlans, balance, monthPlanned, monthPaid, monthRemaining: Math.max(0, monthPlanned - monthPaid), previousPaid, upcomingDue }
   }).filter((debt) => debt.balance > 0)
 })
 const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
