@@ -32,6 +32,7 @@ const eventAmount = ref('')
 const eventEntryNote = ref('')
 const eventEntryDate = ref('')
 const eventDirection = ref(-1)
+const eventAccountType = ref('cash')
 const session = ref(null)
 const authLoading = ref(true)
 const localAuthError = ref('')
@@ -900,9 +901,10 @@ async function createEvent() {
 async function addEventEntry() {
   const amount = parseMoney(eventAmount.value.trim(), moneyUnit.value)
   if (!amount || !selectedEvent.value || !eventEntryDate.value) return notifyError('Nhập số tiền và ngày giao dịch hợp lệ')
+  if (!eventAccountType.value) return notifyError('Chọn nguồn tiền trước khi ghi giao dịch sự kiện')
   if (eventEntryDate.value < selectedEvent.value.start_date || eventEntryDate.value > selectedEvent.value.end_date) return notifyError('Ngày giao dịch phải nằm trong thời gian sự kiện')
   try {
-    const created = await addEntry(amount * eventDirection.value, eventEntryNote.value.trim() || null, 'cash', null, 'transaction', false, selectedEvent.value.id, `${eventEntryDate.value}T12:00:00.000Z`)
+    const created = await addEntry(amount * eventDirection.value, eventEntryNote.value.trim() || null, eventAccountType.value, null, 'transaction', false, selectedEvent.value.id, `${eventEntryDate.value}T12:00:00.000Z`)
     events.value = events.value.map((event) => event.id === selectedEvent.value.id ? { ...event, entries: [created, ...(event.entries || [])] } : event)
     entries.value = [created, ...entries.value]
     eventAmount.value = ''; eventEntryNote.value = ''; eventDirection.value = -1
@@ -1143,7 +1145,9 @@ const detailVisibleRange = computed(() => {
             v-model:event-entry-note="eventEntryNote"
             v-model:event-entry-date="eventEntryDate"
             v-model:event-direction="eventDirection"
+            v-model:event-account-type="eventAccountType"
             :events="events"
+            :account-types="accountTypes"
             :format-amount="fmt"
             @create-event="createEvent"
             @add-event-entry="addEventEntry"
