@@ -264,6 +264,8 @@
   color: var(--red);
   background: rgba(166, 54, 44, 0.05);
 }
+.debt-lent-summary { color: #a87500; }
+
 .debt-summary,
 .debt-month {
   display: flex;
@@ -348,6 +350,7 @@
 .debt-account-row span strong { overflow: hidden; font: 600 15px 'Inter', sans-serif; text-overflow: ellipsis; white-space: nowrap; }
 .debt-account-row small { color: var(--ink-faint); font: 11px 'Inter', sans-serif; }
 .debt-account-row > strong { flex: 0 0 auto; color: var(--red); font: 600 14px 'JetBrains Mono', monospace; }
+.debt-lent-row > strong { color: #a87500; }
 .debt-empty { padding: 14px 0; }
 .debt-primary-btn { width: 100%; min-height: 44px; margin-top: 4px; font-size: 13px; }
 .debt-manager .debt-field-label { display: grid; gap: 5px; }

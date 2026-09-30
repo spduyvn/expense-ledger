@@ -9,6 +9,7 @@ defineProps({
   currentMonthDebt: { type: Number, required: true },
   nextMonthDebt: { type: Number, required: true },
   currentDebt: { type: Number, required: true },
+  currentLent: { type: Number, required: true },
   formatAmount: { type: Function, required: true }
 })
 
@@ -55,6 +56,7 @@ defineEmits(['open-settings', 'toggle-balances', 'start-balance-edit', 'open-deb
         <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Cần trả tháng này: số tiền đang được ẩn' : `Cần trả tháng này: ${formatAmount(currentMonthDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Cần trả tháng này</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(currentMonthDebt) }} <small>₫</small></strong></button>
         <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Cần trả tháng sau: số tiền đang được ẩn' : `Cần trả tháng sau: ${formatAmount(nextMonthDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Cần trả tháng sau</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(nextMonthDebt) }} <small>₫</small></strong></button>
         <button type="button" class="debt-summary debt-total-button" :aria-label="balancesHidden ? 'Tổng nợ: số tiền đang được ẩn' : `Tổng nợ: ${formatAmount(currentDebt)} đồng`" @click="$emit('open-debt-manager')"><span>Tổng nợ</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(currentDebt) }} <small>₫</small></strong></button>
+        <button type="button" class="debt-summary debt-total-button debt-lent-summary" :aria-label="balancesHidden ? 'Tổng tiền đang cho vay: số tiền đang được ẩn' : `Tổng tiền đang cho vay: ${formatAmount(currentLent)} đồng`" @click="$emit('open-debt-manager')"><span>Đang cho vay</span><strong :class="{ masked: balancesHidden }">{{ balancesHidden ? '••••••' : formatAmount(currentLent) }} <small>₫</small></strong></button>
         <button type="button" class="debt-add-btn debt-open-btn" @click="$emit('open-debt-manager')">Quản lý khoản nợ</button>
       </section>
     </div>

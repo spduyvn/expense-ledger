@@ -350,7 +350,21 @@ const debts = computed(() => {
   }).filter((debt) => debt.balance > 0)
 })
 const owedDebts = computed(() => debts.value.filter((debt) => debt.debt_type !== 'lent'))
-const currentDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.balance, 0))
+// Tổng trên toàn bộ dữ liệu khoản nợ, không phụ thuộc vào danh sách đang hiển thị
+// (danh sách `debts` loại các khoản đã tất toán).
+const debtBalances = computed(() => {
+  const balances = new Map(debtAccounts.value.map((account) => [account.id, 0]))
+  for (const entry of debtEntries.value) {
+    balances.set(entry.debt_id, (balances.get(entry.debt_id) || 0) + Number(entry.amount))
+  }
+  return new Map(debtAccounts.value.map((account) => [account.id, Math.max(0, balances.get(account.id) || 0)]))
+})
+const currentDebt = computed(() => debtAccounts.value
+  .filter((account) => account.debt_type !== 'lent')
+  .reduce((total, account) => total + (debtBalances.value.get(account.id) || 0), 0))
+const currentLent = computed(() => debtAccounts.value
+  .filter((account) => account.debt_type === 'lent')
+  .reduce((total, account) => total + (debtBalances.value.get(account.id) || 0), 0))
 const currentMonthDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.monthRemaining, 0))
 const nextMonthDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.plans
   .filter((plan) => plan.month === nextDebtMonth.value)
@@ -1015,6 +1029,7 @@ const detailVisibleRange = computed(() => {
           :current-month-debt="currentMonthDebt"
           :next-month-debt="nextMonthDebt"
           :current-debt="currentDebt"
+          :current-lent="currentLent"
           :format-amount="fmt"
           @open-settings="settingsOpen = true"
           @toggle-balances="toggleBalances"
