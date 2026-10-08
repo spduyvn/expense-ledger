@@ -265,6 +265,17 @@
   background: rgba(166, 54, 44, 0.05);
 }
 .debt-lent-summary { color: #a87500; }
+.debt-schedule-btn { width: 100%; margin-top: 9px; padding: 7px 9px; border: 1px solid var(--rule-strong); border-radius: 4px; background: var(--paper-card); color: var(--brass); cursor: pointer; font: 600 11px 'Inter', sans-serif; }
+.debt-schedule-btn:hover { background: var(--paper-spine); }
+.debt-schedule-backdrop { align-items: flex-end; padding: 0; }
+.debt-schedule { width: min(100%, 520px); max-height: min(88vh, 720px); padding: 18px; border-radius: 16px 16px 0 0; overflow-y: auto; }
+.debt-schedule-intro { margin: 10px 0 14px; color: var(--ink-faint); font: 13px/1.5 'Inter', sans-serif; }
+.debt-schedule-list { display: grid; gap: 14px; }
+.debt-schedule-month { border: 1px solid var(--rule); border-radius: 8px; overflow: hidden; }
+.debt-schedule-month-heading, .debt-schedule-item { display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px; }
+.debt-schedule-month-heading { background: rgba(156, 122, 60, .08); color: var(--brass); font: 600 13px 'Inter', sans-serif; }
+.debt-schedule-item { border-top: 1px solid var(--rule); color: var(--ink); font: 12px 'Inter', sans-serif; }
+.debt-schedule-item strong, .debt-schedule-month-heading strong:last-child { font-family: 'JetBrains Mono', monospace; white-space: nowrap; }
 
 .debt-summary,
 .debt-month {
