@@ -8,6 +8,7 @@ import HistoryPage from './components/HistoryPage.vue'
 import AppDialogs from './components/AppDialogs.vue'
 import SettingsModal from './components/SettingsModal.vue'
 import DebtManager from './components/DebtManager.vue'
+import DebtSchedule from './components/DebtSchedule.vue'
 import EventsPage from './components/EventsPage.vue'
 import MonthlyReport from './components/MonthlyReport.vue'
 import ToastStack from './components/ToastStack.vue'
@@ -73,6 +74,7 @@ const detailPage = ref(1)
 const selectedEntryDetail = ref(null)
 const confirmingEntry = ref(null)
 const debtManagerOpen = ref(false)
+const debtScheduleOpen = ref(false)
 const settingsOpen = ref(false)
 const appearance = ref('ledger')
 const dayResetTimeZone = ref(browserTimeZone())
@@ -369,6 +371,20 @@ const currentMonthDebt = computed(() => owedDebts.value.reduce((total, debt) => 
 const nextMonthDebt = computed(() => owedDebts.value.reduce((total, debt) => total + debt.plans
   .filter((plan) => plan.month === nextDebtMonth.value)
   .reduce((subtotal, plan) => subtotal + plan.remaining, 0), 0))
+const debtSchedule = computed(() => {
+  const byMonth = new Map()
+  for (const debt of owedDebts.value) {
+    for (const plan of debt.plans) {
+      const month = String(plan.month).slice(0, 7)
+      if (month <= currentDebtMonth.value || plan.remaining <= 0) continue
+      if (!byMonth.has(month)) byMonth.set(month, { key: month, total: 0, items: [] })
+      const summary = byMonth.get(month)
+      summary.total += plan.remaining
+      summary.items.push({ debtId: debt.id, name: debt.name, amount: plan.remaining })
+    }
+  }
+  return [...byMonth.values()].sort((a, b) => a.key.localeCompare(b.key))
+})
 const todayTotalPages = computed(() => Math.max(1, Math.ceil(todayRows.value.length / pageSize)))
 const paginatedTodayRows = computed(() => {
   const start = (todayPage.value - 1) * pageSize
@@ -748,6 +764,14 @@ function closeDebtManager() {
   debtManagerOpen.value = false
 }
 
+function openDebtSchedule() {
+  debtScheduleOpen.value = true
+}
+
+function closeDebtSchedule() {
+  debtScheduleOpen.value = false
+}
+
 async function createDebt(payload) {
   error.value = ''
   try {
@@ -1035,6 +1059,7 @@ const detailVisibleRange = computed(() => {
           @toggle-balances="toggleBalances"
           @start-balance-edit="startBalanceEdit"
           @open-debt-manager="openDebtManager"
+          @open-debt-schedule="openDebtSchedule"
         />
         <EntryForm
           v-model:input="input"
@@ -1222,6 +1247,13 @@ const detailVisibleRange = computed(() => {
       @delete="removeDebt"
       @save-plan="updateDebtPlan"
       @delete-plan="removeDebtPlan"
+    />
+    <DebtSchedule
+      :open="debtScheduleOpen"
+      :schedule="debtSchedule"
+      :balances-hidden="balancesHidden"
+      :format-amount="fmt"
+      @close="closeDebtSchedule"
     />
     <SettingsModal
       :open="settingsOpen"
