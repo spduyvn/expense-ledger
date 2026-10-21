@@ -864,6 +864,7 @@
 .tag-report-value { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px; }
 .tag-report-track { height: 7px; overflow: hidden; border-radius: 999px; background: var(--rule); }
 .tag-report-track span { display: block; min-width: 3px; height: 100%; border-radius: inherit; background: var(--brass); }
+.tag-report-track.income-track span { background: var(--green); }
 .tag-report-value strong { min-width: 72px; text-align: right; font: 12px 'JetBrains Mono', monospace; }
 @media (max-width: 480px) {
   .report-heading { align-items: start; flex-direction: column; }

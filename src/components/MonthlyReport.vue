@@ -26,5 +26,12 @@ defineEmits(['move-month'])
       </div>
       <p v-else class="empty">Chưa có khoản chi nào được tính trong tháng này.</p>
     </section>
+    <section class="tag-report">
+      <div class="tag-report-heading"><h3>Thu nhập theo thẻ</h3><span>{{ report.tagIncomes.length }} thẻ</span></div>
+      <div v-if="report.tagIncomes.length" class="tag-report-list">
+        <div v-for="tag in report.tagIncomes" :key="tag.name" class="tag-report-row"><div class="tag-report-name"><span>{{ tag.name }}</span><small>{{ Math.round(tag.share * 100) }}%</small></div><div class="tag-report-value"><div class="tag-report-track income-track"><span :style="{ width: `${tag.share * 100}%` }"></span></div><strong>{{ formatAmount(tag.amount) }}</strong></div></div>
+      </div>
+      <p v-else class="empty">Chưa có khoản thu nào được tính trong tháng này.</p>
+    </section>
   </section>
 </template>
