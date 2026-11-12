@@ -76,7 +76,7 @@ const confirmingEntry = ref(null)
 const debtManagerOpen = ref(false)
 const debtScheduleOpen = ref(false)
 const settingsOpen = ref(false)
-const appearance = ref('ledger')
+const appearance = ref('dashboard')
 const dayResetTimeZone = ref(browserTimeZone())
 const moneyUnit = ref('k')
 const toasts = ref([])
@@ -126,7 +126,7 @@ onMounted(async () => {
   try {
     balancesHidden.value = localStorage.getItem('dmoney-balances-hidden') === 'true'
     const savedAppearance = localStorage.getItem('dmoney-appearance')
-    if (['ledger', 'modern', 'midnight', 'breeze'].includes(savedAppearance)) appearance.value = savedAppearance
+    if (['dashboard', 'ledger', 'modern', 'midnight', 'breeze'].includes(savedAppearance)) appearance.value = savedAppearance
     const savedDayResetTimeZone = localStorage.getItem('dmoney-day-reset-time-zone')
     if (savedDayResetTimeZone) dayResetTimeZone.value = savedDayResetTimeZone
     const savedMoneyUnit = localStorage.getItem('dmoney-money-unit')

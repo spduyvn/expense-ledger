@@ -83,6 +83,13 @@
   display: block;
   border-radius: 2px;
 }
+.dashboard-option .appearance-preview {
+  border: 1px solid #d7e1ef;
+  background: #f6f8fb;
+}
+.dashboard-option .appearance-preview i:first-child { background: #1d2b43; }
+.dashboard-option .appearance-preview i:nth-child(2) { background: #3b5ccc; }
+.dashboard-option .appearance-preview i:last-child { background: #dfe7f1; }
 .ledger-option .appearance-preview {
   border: 1px solid #d4c9a8;
   background: #f5f1e6;

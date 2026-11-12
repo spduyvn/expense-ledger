@@ -25,6 +25,10 @@ defineEmits(['close', 'update:appearance', 'update:day-reset-time-zone', 'update
         <h3 id="appearance-title">Giao diện</h3>
         <p>Chọn cách hiển thị phù hợp với bạn.</p>
         <div class="appearance-options" role="radiogroup" aria-label="Chọn giao diện">
+          <button type="button" class="appearance-option dashboard-option" :class="{ active: appearance === 'dashboard' }" role="radio" :aria-checked="appearance === 'dashboard'" @click="$emit('update:appearance', 'dashboard')">
+            <span class="appearance-preview" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span><strong>Dashboard</strong><small>Bố cục hiện đại, rõ ràng và tối ưu cho mọi màn hình.</small></span>
+          </button>
           <button type="button" class="appearance-option ledger-option" :class="{ active: appearance === 'ledger' }" role="radio" :aria-checked="appearance === 'ledger'" @click="$emit('update:appearance', 'ledger')">
             <span class="appearance-preview" aria-hidden="true"><i></i><i></i><i></i></span>
             <span><strong>Sổ tay</strong><small>Nền giấy, màu mực và phong cách hiện tại.</small></span>

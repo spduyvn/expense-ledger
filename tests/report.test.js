@@ -22,11 +22,20 @@ test('buildMonthlyReport summarizes monthly cash flow and expense tags', () => {
     { name: 'Lương', amount: 2000000, share: 2000000 / 12300000 },
     { name: 'Thưởng', amount: 300000, share: 300000 / 12300000 }
   ])
-  assert.deepEqual(report, {
+  assert.deepEqual({
+    income: report.income,
+    expense: report.expense,
+    net: report.net,
+    tagExpenses: report.tagExpenses,
+    tagIncomes: report.tagIncomes
+  }, {
     income: 10000000,
     expense: 200000,
     net: 9800000,
     tagExpenses: [{ name: 'Ăn uống', amount: 120000, share: 0.6 }, { name: 'Không gắn thẻ', amount: 80000, share: 0.4 }],
     tagIncomes: [{ name: 'Không gắn thẻ', amount: 10000000, share: 1 }]
   })
+  assert.equal(report.dailyCashflow.length, 31)
+  assert.deepEqual(report.dailyCashflow[1], { key: '2026-08-02', day: 2, income: 10000000, expense: 0, net: 10000000 })
+  assert.deepEqual(report.dailyCashflow[2], { key: '2026-08-03', day: 3, income: 0, expense: 120000, net: -120000 })
 })

@@ -1,0 +1,147 @@
+.appearance-dashboard {
+  --paper: #f6f8fb;
+  --paper-card: #ffffff;
+  --paper-spine: #edf1f7;
+  --ink: #152238;
+  --ink-faint: #64748b;
+  --rule: #e4eaf2;
+  --rule-strong: #cfd9e6;
+  --brass: #3b5ccc;
+  --red: #c63f35;
+  --green: #13795b;
+  min-height: 100vh;
+  background: #f6f8fb;
+  font-family: var(--font-ui);
+}
+
+.appearance-dashboard .page { padding: 32px 24px; background: transparent; }
+.appearance-dashboard .passbook { max-width: 1280px; border: 0; border-radius: 24px; background: transparent; box-shadow: none; overflow: visible; }
+.appearance-dashboard .spine { display: none; }
+.appearance-dashboard .sheet { display: grid; grid-template-columns: 296px minmax(0, 1fr); gap: 28px; padding: 0; }
+.appearance-dashboard .head { grid-row: 1 / span 6; margin: 0; padding: 22px; border: 1px solid #dfe7f1; border-radius: 20px; background: #fff; box-shadow: 0 8px 24px rgba(21, 34, 56, .05); }
+.appearance-dashboard .head-text { padding-bottom: 20px; }
+.appearance-dashboard .head h1 { color: var(--ink); font-family: var(--font-ui); font-size: 27px; letter-spacing: -.06em; }
+.appearance-dashboard .eyebrow { color: #6073aa; font-family: var(--font-ui); }
+.appearance-dashboard .settings-btn { min-height: 36px; border-color: var(--rule-strong); background: #fff; color: var(--ink); font-family: var(--font-ui); }
+.appearance-dashboard .balance-controls { display: block; margin-top: 0; }
+.appearance-dashboard .balance-stamps { border: 0; border-radius: 0; background: transparent; overflow: visible; }
+.appearance-dashboard .balance-total { gap: 5px; padding: 20px; border-radius: 14px; background: #1d2b43; color: #fff; }
+.appearance-dashboard .balance-total-label { color: #b7c8f8; }
+.appearance-dashboard .balance-total-amount, .appearance-dashboard .balance-source-amount, .appearance-dashboard .debt-summary strong, .appearance-dashboard .row-amount { font-family: var(--font-number); letter-spacing: -.04em; }
+.appearance-dashboard .balance-visibility-btn { color: #cbd7ff; }
+.appearance-dashboard .balance-source-stamps { display: grid; grid-template-columns: 1fr; gap: 2px; margin-top: 10px; padding: 0; background: transparent; }
+.appearance-dashboard .balance-source { grid-template-columns: 30px 1fr auto; min-height: 46px; padding: 0 4px; }
+.appearance-dashboard .balance-source:not(:last-child)::after { background: var(--rule); }
+.appearance-dashboard .balance-source-icon { background: #edf2ff; }
+.appearance-dashboard .balance-source-icon::before { color: #3b5ccc; }
+.appearance-dashboard .balance-source-label { font-family: var(--font-ui); }
+.appearance-dashboard .debt-card { margin-top: 18px; padding: 16px; border-color: #f0d2cd; border-radius: 14px; background: #fff9f8; }
+.appearance-dashboard .debt-summary { padding: 4px 0; color: #7d5c58; font-family: var(--font-ui); }
+.appearance-dashboard .debt-summary strong { color: var(--ink); }
+.appearance-dashboard .debt-add-btn { min-height: 42px; border-radius: 9px; background: var(--brass); font-family: var(--font-ui); }
+.appearance-dashboard .debt-schedule-btn { min-height: 38px; border-radius: 9px; background: #fff; color: var(--brass); }
+.appearance-dashboard .entry-form, .appearance-dashboard .ledger { grid-column: 2; border: 1px solid #dfe7f1; border-radius: 20px; background: #fff; box-shadow: 0 8px 24px rgba(21, 34, 56, .05); }
+.appearance-dashboard .entry-form { display: grid; grid-template-columns: 1fr 1fr auto; align-items: end; gap: 14px; padding: 20px; margin: 0; }
+.appearance-dashboard .amount-row { grid-column: 1; }
+.appearance-dashboard .note-daily-row { grid-column: 2; }
+.appearance-dashboard .choice-group { grid-column: span 1; }
+.appearance-dashboard .entry-form > .add-btn { grid-column: 3; grid-row: 1 / span 3; min-width: 104px; min-height: 44px; }
+.appearance-dashboard .amount-input, .appearance-dashboard .note-input { border-color: var(--rule-strong); border-radius: 9px; background: #f8fafc; font-family: var(--font-ui); }
+.appearance-dashboard .amount-input:focus, .appearance-dashboard .note-input:focus { border-color: var(--brass); box-shadow: 0 0 0 3px rgba(59, 92, 204, .12); }
+.appearance-dashboard .entry-direction button, .appearance-dashboard .choice-group button { min-height: 36px; border-radius: 8px; font-family: var(--font-ui); }
+.appearance-dashboard .entry-direction button.active, .appearance-dashboard .choice-group button.active { border-color: #9aaff4; background: #edf2ff; color: #2b4db8; }
+.appearance-dashboard .add-btn, .appearance-dashboard .save-balance-btn { border-radius: 9px; background: var(--brass); font-family: var(--font-ui); }
+.appearance-dashboard .balance-form, .appearance-dashboard .error { grid-column: 2; }
+.appearance-dashboard .view-tabs { grid-column: 2; margin: 0; padding: 4px; border: 1px solid #dfe7f1; border-radius: 12px; background: #eef2f7; }
+.appearance-dashboard .view-tabs button { min-height: 40px; border: 0; border-radius: 8px; font-family: var(--font-ui); }
+.appearance-dashboard .view-tabs button.active { background: #fff; color: #2b4db8; box-shadow: 0 2px 5px rgba(21, 34, 56, .08); }
+.appearance-dashboard .ledger-subtabs { grid-column: 2; margin: -16px 0 0; padding: 0 4px; }
+.appearance-dashboard .ledger-subtabs button { min-height: 36px; border-radius: 8px; font-family: var(--font-ui); }
+.appearance-dashboard .ledger-subtabs button.active { border-color: transparent; background: #edf2ff; color: #2b4db8; }
+.appearance-dashboard .ledger { padding: 22px; }
+.appearance-dashboard .daily-balance { border: 1px solid #c8d6ff; border-radius: 12px; background: #f2f6ff; color: #53637f; font-family: var(--font-ui); }
+.appearance-dashboard .row { padding: 13px 8px; border-radius: 9px; }
+.appearance-dashboard .row:hover, .appearance-dashboard .day-summary-row:hover { background: #f7f9fc; }
+.appearance-dashboard .row-note { font-family: var(--font-ui); font-weight: 600; }
+.appearance-dashboard .account-badge, .appearance-dashboard .tag-badge { border-color: #d9e2ee; background: #f8fafc; color: #53637f; font-family: var(--font-ui); }
+.appearance-dashboard .pos { color: var(--green); }
+.appearance-dashboard .neg { color: var(--red); }
+
+.appearance-dashboard .cashflow-chart { padding: 18px; border: 1px solid var(--rule); border-radius: 14px; background: #fbfcfe; }
+.appearance-dashboard .cashflow-chart-heading { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
+.appearance-dashboard .cashflow-chart h3 { margin: 0; color: var(--ink); font: 650 17px var(--font-ui); }
+.appearance-dashboard .cashflow-chart p { margin: 4px 0 0; color: var(--ink-faint); font: 12px/1.45 var(--font-ui); }
+.appearance-dashboard .chart-legend { display: flex; flex-wrap: wrap; justify-content: end; gap: 10px; color: var(--ink-faint); font: 12px var(--font-ui); }
+.appearance-dashboard .chart-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.appearance-dashboard .legend-dot { width: 9px; height: 9px; border-radius: 3px; }
+.appearance-dashboard .income-dot { background: var(--green); }
+.appearance-dashboard .expense-dot { background: var(--red); }
+.appearance-dashboard .cashflow-scroll { margin-top: 14px; overflow-x: auto; overscroll-behavior-inline: contain; }
+.appearance-dashboard .cashflow-scroll:focus-visible { outline: 3px solid rgba(59, 92, 204, .32); outline-offset: 3px; }
+.appearance-dashboard .cashflow-plot { display: grid; grid-template-columns: repeat(31, minmax(25px, 1fr)); gap: 4px; align-items: end; min-width: 720px; height: 210px; padding: 16px 2px 0; border-bottom: 1px solid var(--rule-strong); background: repeating-linear-gradient(to top, transparent 0, transparent 49px, #edf1f6 50px); }
+.appearance-dashboard .cashflow-day { position: relative; display: grid; grid-template-rows: 1fr 19px; align-items: end; height: 100%; min-width: 0; padding: 0; border: 0; background: transparent; color: var(--ink-faint); cursor: pointer; }
+.appearance-dashboard .cashflow-day:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; border-radius: 4px; }
+.appearance-dashboard .cashflow-bars { display: flex; align-items: end; justify-content: center; gap: 2px; height: 166px; }
+.appearance-dashboard .cashflow-bar { display: block; width: 8px; min-height: 2px; border-radius: 4px 4px 0 0; }
+.appearance-dashboard .cashflow-bar.income-bar { background: var(--green); }
+.appearance-dashboard .cashflow-bar.expense-bar { background: var(--red); }
+.appearance-dashboard .cashflow-label { padding-top: 5px; font: 10px var(--font-ui); text-align: center; }
+.appearance-dashboard .cashflow-day:nth-child(even) .cashflow-label { visibility: hidden; }
+.appearance-dashboard .cashflow-tooltip { position: absolute; z-index: 3; bottom: calc(100% + 8px); left: 50%; display: none; width: 176px; padding: 9px 10px; border: 1px solid var(--rule-strong); border-radius: 8px; background: #fff; box-shadow: 0 8px 20px rgba(21, 34, 56, .16); color: var(--ink); font: 11px/1.55 var(--font-ui); text-align: left; transform: translateX(-50%); pointer-events: none; }
+.appearance-dashboard .cashflow-tooltip strong, .appearance-dashboard .cashflow-tooltip span { display: block; }
+.appearance-dashboard .cashflow-tooltip b { float: right; font-family: var(--font-number); }
+.appearance-dashboard .cashflow-day:hover .cashflow-tooltip, .appearance-dashboard .cashflow-day:focus-visible .cashflow-tooltip { display: block; }
+.appearance-dashboard .cashflow-table { margin-top: 12px; color: var(--ink-faint); font: 12px var(--font-ui); }
+.appearance-dashboard .cashflow-table summary { width: fit-content; cursor: pointer; }
+.appearance-dashboard .cashflow-table-scroll { max-height: 280px; margin-top: 9px; overflow: auto; border: 1px solid var(--rule); border-radius: 8px; }
+.appearance-dashboard .cashflow-table table { width: 100%; border-collapse: collapse; }
+.appearance-dashboard .cashflow-table th, .appearance-dashboard .cashflow-table td { padding: 8px 10px; border-bottom: 1px solid var(--rule); text-align: right; white-space: nowrap; }
+.appearance-dashboard .cashflow-table th:first-child { text-align: left; }
+.appearance-dashboard .cashflow-table thead { position: sticky; top: 0; background: #f8fafc; }
+
+@media (max-width: 900px) {
+  .appearance-dashboard .page { padding: 18px; }
+  .appearance-dashboard .sheet { grid-template-columns: 240px minmax(0, 1fr); gap: 18px; }
+  .appearance-dashboard .head { padding: 16px; }
+  .appearance-dashboard .entry-form { grid-template-columns: 1fr; }
+  .appearance-dashboard .amount-row, .appearance-dashboard .note-daily-row, .appearance-dashboard .choice-group, .appearance-dashboard .entry-form > .add-btn { grid-column: 1; }
+  .appearance-dashboard .entry-form > .add-btn { grid-row: auto; min-height: 42px; }
+}
+
+@media (max-width: 720px) {
+  .appearance-dashboard .page { padding: 0; }
+  .appearance-dashboard .passbook { width: 100%; min-height: 100vh; }
+  .appearance-dashboard .sheet { display: flex; flex-direction: column; gap: 0; padding: 0 14px calc(86px + env(safe-area-inset-bottom)); }
+  .appearance-dashboard .head { order: 1; margin: 14px 0 0; padding: 18px; }
+  .appearance-dashboard .head-text { padding-bottom: 16px; }
+  .appearance-dashboard .balance-source-stamps { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; }
+  .appearance-dashboard .balance-source { grid-template-columns: 1fr; justify-items: center; min-height: 64px; padding: 8px 2px; text-align: center; }
+  .appearance-dashboard .balance-source:not(:last-child)::after { top: 9px; right: 0; bottom: 9px; left: auto; width: 1px; height: auto; }
+  .appearance-dashboard .balance-source-icon { display: none; }
+  .appearance-dashboard .balance-source-amount { min-width: 0; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .appearance-dashboard .debt-card { display: grid; grid-template-columns: 1fr 1fr; column-gap: 12px; }
+  .appearance-dashboard .debt-schedule-btn, .appearance-dashboard .debt-add-btn { grid-column: 1 / -1; }
+  .appearance-dashboard .entry-form { order: 2; margin-top: 14px; padding: 16px; }
+  .appearance-dashboard .ledger-subtabs { order: 3; margin: 10px 0 0; }
+  .appearance-dashboard .ledger { order: 4; margin-top: 12px; padding: 16px; }
+  .appearance-dashboard .view-tabs { position: fixed; z-index: 4; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); left: 12px; order: 5; border: 0; background: rgba(238, 242, 247, .96); box-shadow: 0 10px 26px rgba(21, 34, 56, .2); backdrop-filter: blur(12px); }
+  .appearance-dashboard .view-tabs button { min-height: 44px; }
+  .appearance-dashboard .row { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .appearance-dashboard .row-time { display: none; }
+  .appearance-dashboard .row-amount { min-width: 80px; }
+  .appearance-dashboard .cashflow-chart { padding: 14px; }
+}
+
+@media (max-width: 430px) {
+  .appearance-dashboard .sheet { padding-right: 10px; padding-left: 10px; }
+  .appearance-dashboard .head { margin-top: 10px; }
+  .appearance-dashboard .head h1 { font-size: 25px; }
+  .appearance-dashboard .balance-total-amount { min-width: 0; font-size: clamp(23px, 8vw, 29px); overflow-wrap: anywhere; }
+  .appearance-dashboard .balance-source-label { max-width: 100%; overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+  .appearance-dashboard .debt-summary { min-width: 0; }
+  .appearance-dashboard .debt-summary strong { min-width: 0; font-size: 14px; }
+  .appearance-dashboard .cashflow-chart-heading { display: block; }
+  .appearance-dashboard .chart-legend { justify-content: start; margin-top: 10px; }
+}
+
+@media (prefers-reduced-motion: reduce) { .appearance-dashboard * { scroll-behavior: auto !important; transition: none !important; } }
